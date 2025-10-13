@@ -1,5 +1,5 @@
--- Created by Vertabelo (http://vertabelo.com)
--- Last modification date: 2024-11-04 21:50:30.307
+-- Created by Redgate Data Modeler (https://datamodeler.redgate-platform.com)
+-- Last modification date: 2025-10-09 14:39:13.786
 
 -- tables
 -- Table: Certificado
@@ -11,6 +11,18 @@ CREATE TABLE Certificado (
     fecha_modificacion date  NOT NULL,
     Usuario_id_usuario int  NOT NULL,
     CONSTRAINT Certificado_pk PRIMARY KEY (id_certificado)
+);
+
+-- Table: Contrasenia
+CREATE TABLE Contrasenia (
+    id_pass serial  NOT NULL,
+    contrasenia varchar(30)  NOT NULL,
+    fecha_creacion date  NOT NULL,
+    longitud int  NOT NULL,
+    complejidad int  NOT NULL,
+    intentos_restantes int  NOT NULL,
+    ultimo_log date  NOT NULL,
+    CONSTRAINT Contrasenia_pk PRIMARY KEY (id_pass)
 );
 
 -- Table: Encuesta
@@ -40,7 +52,7 @@ CREATE TABLE Estado_Certificado (
     archivo varchar(50)  NOT NULL,
     estado varchar(15)  NOT NULL,
     fecha_estado date  NOT NULL,
-    Certificado_id_certificado int,
+    Certificado_id_certificado int  NOT NULL,
     Estudiante_id_estudiante int  NOT NULL,
     CONSTRAINT Estado_Certificado_pk PRIMARY KEY (id_est_certificado)
 );
@@ -111,7 +123,7 @@ CREATE TABLE H_Noticias (
     titulo varchar(50)  NOT NULL,
     descripcion text  NOT NULL,
     img varchar(50)  NOT NULL,
-    fecha_modificado timestamp  NOT NULL,
+    fecha_modificado date  NOT NULL,
     estado varchar(30)  NOT NULL,
     Usuario_id_usuario int  NOT NULL,
     ver int  NOT NULL,
@@ -243,6 +255,13 @@ CREATE TABLE Respuesta (
     CONSTRAINT Respuesta_pk PRIMARY KEY (id_respuesta)
 );
 
+-- Table: Roles
+CREATE TABLE Roles (
+    id_rol serial  NOT NULL,
+    nombre_rol varchar(50)  NOT NULL,
+    CONSTRAINT Roles_pk PRIMARY KEY (id_rol)
+);
+
 -- Table: Soporte
 CREATE TABLE Soporte (
     id_soporte serial  NOT NULL,
@@ -273,10 +292,11 @@ CREATE TABLE Usuario (
     nombre varchar(50)  NOT NULL,
     telefono int  NOT NULL,
     correo varchar(40)  NOT NULL,
-    carrera varchar(40),
+    carrera varchar(40)  NOT NULL,
     rol varchar(20)  NOT NULL,
     usuario varchar(30)  NOT NULL,
-    contrasenia varchar(30)  NOT NULL,
+    Roles_id_rol int  NOT NULL,
+    Contrasenia_id_pass int  NOT NULL,
     CONSTRAINT Usuario_pk PRIMARY KEY (id_usuario)
 );
 
@@ -284,244 +304,170 @@ CREATE TABLE Usuario (
 -- Reference: Certificado_Usuario (table: Certificado)
 ALTER TABLE Certificado ADD CONSTRAINT Certificado_Usuario
     FOREIGN KEY (Usuario_id_usuario)
-    REFERENCES Usuario (id_usuario)  
-    NOT DEFERRABLE 
+    REFERENCES Usuario (id_usuario)
+    NOT DEFERRABLE
     INITIALLY IMMEDIATE
 ;
 
 -- Reference: Encuesta_Gestion_Encuesta (table: Encuesta_Gestion)
 ALTER TABLE Encuesta_Gestion ADD CONSTRAINT Encuesta_Gestion_Encuesta
     FOREIGN KEY (Encuesta_id_encuesta)
-    REFERENCES Encuesta (id_encuesta)  
-    NOT DEFERRABLE 
+    REFERENCES Encuesta (id_encuesta)
+    NOT DEFERRABLE
     INITIALLY IMMEDIATE
 ;
 
 -- Reference: Encuesta_Gestion_Pregunta (table: Encuesta_Gestion)
 ALTER TABLE Encuesta_Gestion ADD CONSTRAINT Encuesta_Gestion_Pregunta
     FOREIGN KEY (Pregunta_id_pregunta)
-    REFERENCES Pregunta (id_pregunta)  
-    NOT DEFERRABLE 
+    REFERENCES Pregunta (id_pregunta)
+    NOT DEFERRABLE
     INITIALLY IMMEDIATE
 ;
 
 -- Reference: Encuesta_Plazo (table: Encuesta)
 ALTER TABLE Encuesta ADD CONSTRAINT Encuesta_Plazo
     FOREIGN KEY (Plazo_id_plazo)
-    REFERENCES Plazo (id_plazo)  
-    NOT DEFERRABLE 
+    REFERENCES Plazo (id_plazo)
+    NOT DEFERRABLE
     INITIALLY IMMEDIATE
 ;
 
 -- Reference: Encuesta_Usuario (table: Encuesta)
 ALTER TABLE Encuesta ADD CONSTRAINT Encuesta_Usuario
     FOREIGN KEY (Usuario_id_usuario)
-    REFERENCES Usuario (id_usuario)  
-    NOT DEFERRABLE 
+    REFERENCES Usuario (id_usuario)
+    NOT DEFERRABLE
     INITIALLY IMMEDIATE
 ;
 
 -- Reference: Estado_Certificado_Certificado (table: Estado_Certificado)
 ALTER TABLE Estado_Certificado ADD CONSTRAINT Estado_Certificado_Certificado
     FOREIGN KEY (Certificado_id_certificado)
-    REFERENCES Certificado (id_certificado)  
-    NOT DEFERRABLE 
+    REFERENCES Certificado (id_certificado)
+    NOT DEFERRABLE
     INITIALLY IMMEDIATE
 ;
 
 -- Reference: Estado_Certificado_Estudiante (table: Estado_Certificado)
 ALTER TABLE Estado_Certificado ADD CONSTRAINT Estado_Certificado_Estudiante
     FOREIGN KEY (Estudiante_id_estudiante)
-    REFERENCES Estudiante (id_estudiante)  
-    NOT DEFERRABLE 
+    REFERENCES Estudiante (id_estudiante)
+    NOT DEFERRABLE
     INITIALLY IMMEDIATE
 ;
 
 -- Reference: Estado_Encuesta_Encuesta (table: Estado_Encuesta)
 ALTER TABLE Estado_Encuesta ADD CONSTRAINT Estado_Encuesta_Encuesta
     FOREIGN KEY (Encuesta_id_encuesta)
-    REFERENCES Encuesta (id_encuesta)  
-    NOT DEFERRABLE 
+    REFERENCES Encuesta (id_encuesta)
+    NOT DEFERRABLE
     INITIALLY IMMEDIATE
 ;
 
 -- Reference: Estado_Encuesta_Estudiante (table: Estado_Encuesta)
 ALTER TABLE Estado_Encuesta ADD CONSTRAINT Estado_Encuesta_Estudiante
     FOREIGN KEY (Estudiante_id_estudiante)
-    REFERENCES Estudiante (id_estudiante)  
-    NOT DEFERRABLE 
+    REFERENCES Estudiante (id_estudiante)
+    NOT DEFERRABLE
     INITIALLY IMMEDIATE
 ;
 
 -- Reference: Noticias_Usuario (table: Noticias)
 ALTER TABLE Noticias ADD CONSTRAINT Noticias_Usuario
     FOREIGN KEY (Usuario_id_usuario)
-    REFERENCES Usuario (id_usuario)  
-    NOT DEFERRABLE 
+    REFERENCES Usuario (id_usuario)
+    NOT DEFERRABLE
     INITIALLY IMMEDIATE
 ;
 
 -- Reference: Notificacion_Tipo_Notificacion (table: Notificacion)
 ALTER TABLE Notificacion ADD CONSTRAINT Notificacion_Tipo_Notificacion
     FOREIGN KEY (Tipo_Notificacion_id_notificacion)
-    REFERENCES Tipo_Notificacion (id_notificacion)  
-    NOT DEFERRABLE 
+    REFERENCES Tipo_Notificacion (id_notificacion)
+    NOT DEFERRABLE
     INITIALLY IMMEDIATE
 ;
 
 -- Reference: Notificaciones_Estudiante (table: Notificacion)
 ALTER TABLE Notificacion ADD CONSTRAINT Notificaciones_Estudiante
     FOREIGN KEY (Estudiante_id_estudiante)
-    REFERENCES Estudiante (id_estudiante)  
-    NOT DEFERRABLE 
+    REFERENCES Estudiante (id_estudiante)
+    NOT DEFERRABLE
     INITIALLY IMMEDIATE
 ;
 
 -- Reference: Opciones_Pregunta_Pregunta (table: Opciones_Pregunta)
 ALTER TABLE Opciones_Pregunta ADD CONSTRAINT Opciones_Pregunta_Pregunta
     FOREIGN KEY (Pregunta_id_pregunta)
-    REFERENCES Pregunta (id_pregunta)  
-    NOT DEFERRABLE 
+    REFERENCES Pregunta (id_pregunta)
+    NOT DEFERRABLE
     INITIALLY IMMEDIATE
 ;
 
 -- Reference: PLazo_Usuario (table: Plazo)
 ALTER TABLE Plazo ADD CONSTRAINT PLazo_Usuario
     FOREIGN KEY (Usuario_id_usuario)
-    REFERENCES Usuario (id_usuario)  
-    NOT DEFERRABLE 
+    REFERENCES Usuario (id_usuario)
+    NOT DEFERRABLE
     INITIALLY IMMEDIATE
 ;
 
 -- Reference: Reporte_Usuario (table: Reporte)
 ALTER TABLE Reporte ADD CONSTRAINT Reporte_Usuario
     FOREIGN KEY (Usuario_id_usuario)
-    REFERENCES Usuario (id_usuario)  
-    NOT DEFERRABLE 
+    REFERENCES Usuario (id_usuario)
+    NOT DEFERRABLE
     INITIALLY IMMEDIATE
 ;
 
 -- Reference: Respuesta_Estudiante (table: Respuesta)
 ALTER TABLE Respuesta ADD CONSTRAINT Respuesta_Estudiante
     FOREIGN KEY (Estudiante_id_estudiante)
-    REFERENCES Estudiante (id_estudiante)  
-    NOT DEFERRABLE 
+    REFERENCES Estudiante (id_estudiante)
+    NOT DEFERRABLE
     INITIALLY IMMEDIATE
 ;
 
 -- Reference: Respuesta_Pregunta (table: Respuesta)
 ALTER TABLE Respuesta ADD CONSTRAINT Respuesta_Pregunta
     FOREIGN KEY (Pregunta_id_pregunta)
-    REFERENCES Pregunta (id_pregunta)  
-    NOT DEFERRABLE 
+    REFERENCES Pregunta (id_pregunta)
+    NOT DEFERRABLE
     INITIALLY IMMEDIATE
 ;
 
 -- Reference: Soporte_Tipo_Problema (table: Soporte)
 ALTER TABLE Soporte ADD CONSTRAINT Soporte_Tipo_Problema
     FOREIGN KEY (Tipo_Problema_id_problema)
-    REFERENCES Tipo_Problema (id_problema)  
-    NOT DEFERRABLE 
+    REFERENCES Tipo_Problema (id_problema)
+    NOT DEFERRABLE
     INITIALLY IMMEDIATE
 ;
 
 -- Reference: Soporte_Usuario (table: Soporte)
 ALTER TABLE Soporte ADD CONSTRAINT Soporte_Usuario
     FOREIGN KEY (Usuario_id_usuario)
-    REFERENCES Usuario (id_usuario)  
-    NOT DEFERRABLE 
+    REFERENCES Usuario (id_usuario)
+    NOT DEFERRABLE
+    INITIALLY IMMEDIATE
+;
+
+-- Reference: Usuario_Contrasenia (table: Usuario)
+ALTER TABLE Usuario ADD CONSTRAINT Usuario_Contrasenia
+    FOREIGN KEY (Contrasenia_id_pass)
+    REFERENCES Contrasenia (id_pass)
+    NOT DEFERRABLE
+    INITIALLY IMMEDIATE
+;
+
+-- Reference: Usuario_Roles (table: Usuario)
+ALTER TABLE Usuario ADD CONSTRAINT Usuario_Roles
+    FOREIGN KEY (Roles_id_rol)
+    REFERENCES Roles (id_rol)
+    NOT DEFERRABLE
     INITIALLY IMMEDIATE
 ;
 
 -- End of file.
-
--- INICIO DE TRIGGERS
--- Crear un trigger que registre el estado de una encuesta como "Pendiente" para un nuevo estudiante
--- Paso 1: Crear la función para el trigger
-CREATE OR REPLACE FUNCTION registrar_estado_encuesta()
-RETURNS TRIGGER AS $$
-DECLARE
-    ultimo_id_encuesta INT;
-BEGIN
-    -- Obtener el ID de la última encuesta registrada
-    SELECT id_encuesta INTO ultimo_id_encuesta
-    FROM Encuesta
-    ORDER BY id_encuesta DESC
-    LIMIT 1;
-
-    -- Insertar un nuevo registro en Estado_Encuesta con el ID del estudiante y de la encuesta
-    INSERT INTO Estado_Encuesta (estado, fecha_estado, Estudiante_id_estudiante, Encuesta_id_encuesta)
-    VALUES ('Pendiente', CURRENT_DATE, NEW.id_estudiante, ultimo_id_encuesta);
-
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
--- Paso 2: Crear el trigger que llama a la función después de insertar un nuevo estudiante
-CREATE TRIGGER trigger_registrar_estado_encuesta
-AFTER INSERT ON Estudiante
-FOR EACH ROW
-EXECUTE FUNCTION registrar_estado_encuesta();
-
--- Crear un trigger que inserte un nuevo registro en Estado_Certificado con el estado "Pendiente" para un nuevo estudiante
--- Paso 1: Crear la función para insertar en Estado_Certificado
-CREATE OR REPLACE FUNCTION insertar_estado_certificado()
-RETURNS TRIGGER AS $$
-BEGIN
-    INSERT INTO Estado_Certificado (
-        archivo, estado, fecha_estado, Certificado_id_certificado, Estudiante_id_estudiante
-    ) VALUES (
-        '',               -- archivo vacío
-        'Pendiente',      -- estado
-        CURRENT_DATE,     -- fecha_estado con la fecha actual
-        NULL,             -- Certificado_id_certificado vacío (NULL)
-        NEW.id_estudiante -- id del estudiante recién insertado
-    );
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
--- Paso 2: Crear el trigger que llama a la función después de insertar en Estudiante
-CREATE TRIGGER trigger_estado_certificado
-AFTER INSERT ON Estudiante
-FOR EACH ROW
-EXECUTE FUNCTION insertar_estado_certificado();
-
--- Trigger para eliminar registros relacionados en Estado_Encuesta y Estado_Certificado antes de eliminar un estudiante
--- Crear la función para eliminar registros en Estado_Encuesta
-CREATE OR REPLACE FUNCTION eliminar_estado_encuesta()
-RETURNS TRIGGER AS $$
-BEGIN
-    DELETE FROM Estado_Encuesta
-    WHERE Estudiante_id_estudiante = OLD.id_estudiante;
-    RETURN OLD;
-END;
-$$ LANGUAGE plpgsql;
-
--- Crear el trigger para eliminar en Estado_Encuesta antes de eliminar un estudiante
-CREATE TRIGGER trigger_eliminar_estado_encuesta
-BEFORE DELETE ON Estudiante
-FOR EACH ROW
-EXECUTE FUNCTION eliminar_estado_encuesta();
-
-
--- Crear la función para eliminar registros en Estado_Certificado
-CREATE OR REPLACE FUNCTION eliminar_estado_certificado()
-RETURNS TRIGGER AS $$
-BEGIN
-    DELETE FROM Estado_Certificado
-    WHERE Estudiante_id_estudiante = OLD.id_estudiante;
-    RETURN OLD;
-END;
-$$ LANGUAGE plpgsql;
-
--- Crear el trigger para eliminar en Estado_Certificado antes de eliminar un estudiante
-CREATE TRIGGER trigger_eliminar_estado_certificado
-BEFORE DELETE ON Estudiante
-FOR EACH ROW
-EXECUTE FUNCTION eliminar_estado_certificado();
-
--- Normalizar noticias minusculas y mayusculas
-UPDATE noticias SET estado = LOWER(estado);
-
 
