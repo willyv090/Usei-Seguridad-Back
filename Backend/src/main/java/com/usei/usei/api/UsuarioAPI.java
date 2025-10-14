@@ -180,23 +180,57 @@ public class UsuarioAPI {
     // ---------- Crear Rol ----------
     public static class CrearRolRequest {
         private String nombreRol;
+        private Object activo; // puede venir true/false o "SI"/"NO"
+        private java.util.List<String> accesos; // lista de módulos seleccionados
+
         public String getNombreRol() { return nombreRol; }
         public void setNombreRol(String nombreRol) { this.nombreRol = nombreRol; }
+        public Object getActivo() { return activo; }
+        public void setActivo(Object activo) { this.activo = activo; }
+        public java.util.List<String> getAccesos() { return accesos; }
+        public void setAccesos(java.util.List<String> accesos) { this.accesos = accesos; }
     }
+    // normalizador rápido para campo "activo"
+    private Boolean normalizeActivo(Object v) {
+        if (v == null) return Boolean.TRUE;
+        if (v instanceof Boolean) return (Boolean) v;
+        String s = String.valueOf(v).trim();
+        if (s.equalsIgnoreCase("SI") || s.equalsIgnoreCase("TRUE") || s.equals("1")) return true;
+        if (s.equalsIgnoreCase("NO") || s.equalsIgnoreCase("FALSE") || s.equals("0")) return false;
+        return Boolean.TRUE;
+    }
+
 
     @PostMapping("/rol")
     public ResponseEntity<?> crearRol(@RequestBody CrearRolRequest req) {
         try {
-            Rol saved = rolBL.crearRol(req.getNombreRol());
+            if (req.getNombreRol() == null || req.getNombreRol().isBlank()) {
+                return ResponseEntity.badRequest().body("El nombre del rol es obligatorio.");
+            }
+
+            Boolean activo = normalizeActivo(req.getActivo());
+            String[] accesosArray = (req.getAccesos() != null)
+                    ? req.getAccesos().toArray(new String[0])
+                    : new String[0];
+
+            Rol nuevoRol = new Rol();
+            nuevoRol.setNombreRol(req.getNombreRol().trim());
+            nuevoRol.setActivo(activo);
+            nuevoRol.setAccesos(accesosArray);
+
+            Rol saved = rolBL.crearRolCompleto(nuevoRol);
             return ResponseEntity.status(HttpStatus.CREATED).body(saved);
+
         } catch (RuntimeException ex) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
                     new UnsuccessfulResponse("400", ex.getMessage(), "/usuario/rol")
             );
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error inesperado: " + e.getMessage());
         }
     }
 
-    // ---------- Eliminar Rol (solo si no está en uso) ----------
     @DeleteMapping("/rol/{idRol}")
     public ResponseEntity<?> eliminarRol(@PathVariable Long idRol) {
         try {
@@ -251,5 +285,19 @@ public class UsuarioAPI {
                     ));
         }
     }
+
+    // ---------- Listar Roles ----------
+    @GetMapping("/rol")
+    public ResponseEntity<?> listarRoles() {
+        try {
+            Iterable<Rol> roles = rolBL.listarRoles();
+            return ResponseEntity.ok(roles);
+        } catch (Exception ex) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                    new UnsuccessfulResponse("500", "Error al listar roles: " + ex.getMessage(), "/usuario/rol")
+            );
+        }
+    }
+
 
 }

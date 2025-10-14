@@ -255,13 +255,13 @@ CREATE TABLE Respuesta (
     CONSTRAINT Respuesta_pk PRIMARY KEY (id_respuesta)
 );
 
--- Table: Roles
-CREATE TABLE Roles (
-    id_rol serial  NOT NULL,
-    nombre_rol varchar(50)  NOT NULL,
-    activo boolean  NOT NULL,
-    accesos int  NOT NULL,
-    CONSTRAINT Roles_pk PRIMARY KEY (id_rol)
+-- Table: roles
+CREATE TABLE roles (
+    id_rol SERIAL NOT NULL,
+    nombre_rol VARCHAR(50) NOT NULL,
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    accesos VARCHAR(100)[] DEFAULT '{}',
+    CONSTRAINT roles_pk PRIMARY KEY (id_rol)
 );
 
 -- Table: Soporte
