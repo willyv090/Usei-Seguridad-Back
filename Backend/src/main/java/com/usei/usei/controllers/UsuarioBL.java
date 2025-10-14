@@ -9,7 +9,9 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.usei.usei.models.Rol;
 import com.usei.usei.models.Usuario;
+import com.usei.usei.repositories.RolDAO;
 import com.usei.usei.repositories.UsuarioDAO;
 
 import jakarta.mail.MessagingException;
@@ -20,59 +22,69 @@ public class UsuarioBL implements UsuarioService {
 
     @Autowired
     private UsuarioDAO usuarioDAO;
-    private JavaMailSender mailSender;
+    private final JavaMailSender mailSender;
 
     private String codigoVerificacion;
 
-    @Override
-    @Transactional(readOnly = true)
-    public Iterable<Usuario> findAll() {
-        return usuarioDAO.findAll();
-    }
+    @Autowired
+    private RolDAO rolDAO;
 
     @Autowired
     public UsuarioBL(UsuarioDAO usuarioDAO, JavaMailSender mailSender) {
         this.usuarioDAO = usuarioDAO;
-        this.mailSender = mailSender;  // Inyección de mailSender
+        this.mailSender = mailSender;
     }
+
+    /* ==========================
+       CRUD BÁSICO DE USUARIO
+       ========================== */
 
     @Override
     @Transactional(readOnly = true)
-    public Optional<Usuario> findById(Long id) {
-        return usuarioDAO.findById(id);
-    }
+    public Iterable<Usuario> findAll() { return usuarioDAO.findAll(); }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<Usuario> findById(Long id) { return usuarioDAO.findById(id); }
 
     @Override
     @Transactional
-    public Usuario save(Usuario usuario) {
-        return usuarioDAO.save(usuario);
-    }
+    public Usuario save(Usuario usuario) { return usuarioDAO.save(usuario); }
 
     @Override
     @Transactional
-    public void deleteById(Long id) {
-        usuarioDAO.deleteById(id);
-    }
+    public void deleteById(Long id) { usuarioDAO.deleteById(id); }
 
     @Override
     @Transactional
     public Usuario update(Usuario usuario, Long id) {
-        Optional<Usuario> existingUsuario = usuarioDAO.findById(id);
-        if (existingUsuario.isPresent()) {
-            Usuario usuarioToUpdate = existingUsuario.get();
-            usuarioToUpdate.setNombre(usuario.getNombre());
-            usuarioToUpdate.setTelefono(usuario.getTelefono());
-            usuarioToUpdate.setCorreo(usuario.getCorreo());
-            usuarioToUpdate.setCarrera(usuario.getCarrera());
-            usuarioToUpdate.setRol(usuario.getRol());
-            usuarioToUpdate.setUsuario(usuario.getUsuario());
-            usuarioToUpdate.setContrasenia(usuario.getContrasenia());
+        Usuario usuarioToUpdate = usuarioDAO.findById(id)
+                .orElseThrow(() -> new RuntimeException("Persona no encontrada con el id: " + id));
 
-            return usuarioDAO.save(usuarioToUpdate);
-        } else {
-            throw new RuntimeException("Persona no encontrada con el id: " + id);
-        }
+        usuarioToUpdate.setNombre(usuario.getNombre());
+        usuarioToUpdate.setTelefono(usuario.getTelefono());
+        usuarioToUpdate.setCorreo(usuario.getCorreo());
+        usuarioToUpdate.setCarrera(usuario.getCarrera());
+        usuarioToUpdate.setUsuario(usuario.getUsuario());
+        usuarioToUpdate.setContrasenia(usuario.getContrasenia());
+
+        // Mantienes también el campo texto 'rol' (varchar)
+        try { usuarioToUpdate.setRol(usuario.getRol()); } catch (Exception ignored) {}
+
+        // Si te envían la relación ya resuelta (no obligatorio)
+        try {
+            if (usuario.getRolEntity() != null) {
+                usuarioToUpdate.setRolEntity(usuario.getRolEntity());
+                try { usuarioToUpdate.setRol(usuario.getRolEntity().getNombreRol()); } catch (Exception ignored) {}
+            }
+        } catch (Exception ignored) {}
+
+        return usuarioDAO.save(usuarioToUpdate);
     }
+
+    /* ==========================
+       AUTENTICACIÓN
+       ========================== */
 
     @Override
     @Transactional(readOnly = true)
@@ -80,63 +92,93 @@ public class UsuarioBL implements UsuarioService {
         return usuarioDAO.findByCorreoAndContrasenia(correo, contrasenia);
     }
 
+    /* ==========================
+       CÓDIGO DE VERIFICACIÓN (EMAIL)
+       ========================== */
+
+    @Override
+    @Transactional(readOnly = true)
+    public Long findByMail(String correo) {
+        Usuario usuario = usuarioDAO.findByCorreo(correo);
+        return (usuario == null) ? 0L : usuario.getIdUsuario();
+    }
+
     @Override
     public void enviarCodigoVerificacion(String correo) throws MessagingException {
-
         Usuario usuario = usuarioDAO.findByCorreo(correo);
+        if (usuario == null) throw new MessagingException("No existe usuario con correo: " + correo);
 
         String asunto = "Codigo de Seguridad para cambio de contraseña";
-        String mensaje = "Estimado Director, usted a solicitado un cambio de contraseña, por favor ingrese el siguiente codigo de seguridad: ";
+        String mensaje = "Estimado Director, usted ha solicitado un cambio de contraseña, "
+                + "por favor ingrese el siguiente código de seguridad: ";
 
-        // if (!correo.endsWith("@ucb.edu.bo")) {
-        //     System.out.println("Correo inválido: " + correo);
-        // }else {
-            // Generar el código y guardarlo en la variable de instancia
-            codigoVerificacion = generarCodigoVerificacion();
-            String cuerpoCorreo = mensaje + codigoVerificacion;
-            enviarCorreo(correo, asunto, cuerpoCorreo);
-            System.out.println("Correo enviado a: " + usuario.getNombre());
-        // }
+        this.codigoVerificacion = generarCodigoVerificacion();
+        String cuerpoCorreo = mensaje + this.codigoVerificacion;
+        enviarCorreo(correo, asunto, cuerpoCorreo);
+        System.out.println("Correo enviado a: " + usuario.getNombre());
     }
 
     private String generarCodigoVerificacion() {
         String caracteres = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
         SecureRandom random = new SecureRandom();
         StringBuilder codigo = new StringBuilder(6);
-        
-        for (int i = 0; i < 6; i++) {
-            int index = random.nextInt(caracteres.length());
-            codigo.append(caracteres.charAt(index));
-        }
-        
+        for (int i = 0; i < 6; i++) codigo.append(caracteres.charAt(random.nextInt(caracteres.length())));
         return codigo.toString();
     }
 
-    // Método para usar el código de verificación guardado en otra función
-    public String obtenerCodigoVerificacion() {
-        return codigoVerificacion;
-    }
+    @Override
+    public String obtenerCodigoVerificacion() { return this.codigoVerificacion; }
 
-    // Método para enviar un correo de invitacion
     private void enviarCorreo(String to, String subject, String body) throws MessagingException {
         MimeMessage message = mailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(message, true);
         helper.setTo(to);
         helper.setSubject(subject);
         helper.setText(body, true);
+        mailSender.send(message);
+    }
 
-        mailSender.send(message);  // Enviar el correo
+    /* ==========================
+       ROLES: asignar rol existente
+       ========================== */
+    @Override
+    @Transactional
+    public Usuario assignRole(Long userId, Long roleId, String roleName) {
+        Usuario user = usuarioDAO.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado: " + userId));
+
+        Rol rol;
+        if (roleId != null) {
+            rol = rolDAO.findById(roleId)
+                    .orElseThrow(() -> new RuntimeException("Rol no encontrado: " + roleId));
+        } else if (roleName != null && !roleName.isBlank()) {
+            rol = rolDAO.findByNombreRol(roleName.trim())
+                    .orElseThrow(() -> new RuntimeException("Rol no encontrado: " + roleName));
+        } else {
+            throw new RuntimeException("Debes enviar roleId o roleName");
+        }
+
+        // Respetar tu BD: actualizar FK y el string 'rol'
+        user.setRolEntity(rol);
+        try { user.setRol(rol.getNombreRol()); } catch (Exception ignored) {}
+
+        return usuarioDAO.save(user);
     }
 
     @Override
-    public Long findByMail(String correo){
-        Usuario usuario = usuarioDAO.findByCorreo(correo);
-        if(usuario == null){
-            return 0L;
-        }else{
-            return usuario.getIdUsuario();
-        }
+    @Transactional
+    public Usuario removeRole(Long userId) {
+        Usuario user = usuarioDAO.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado: " + userId));
 
+        Rol sinRol = rolDAO.findByNombreRol("SIN_ROL")
+                .orElseGet(() -> rolDAO.save(new Rol("SIN_ROL")));
+
+        user.setRolEntity(sinRol);
+        // sincroniza el varchar 'rol' para respetar tu BD
+        try { user.setRol(sinRol.getNombreRol()); } catch (Exception ignored) {}
+
+        return usuarioDAO.save(user);
     }
 
 }

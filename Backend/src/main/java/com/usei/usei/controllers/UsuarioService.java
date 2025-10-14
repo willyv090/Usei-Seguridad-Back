@@ -8,22 +8,27 @@ import jakarta.mail.MessagingException;
 
 public interface UsuarioService {
 
-    public Iterable<Usuario> findAll();
+    Iterable<Usuario> findAll();
 
-    public Optional<Usuario> findById(Long id);
+    Optional<Usuario> findById(Long id);
 
-    public Usuario save(Usuario newuUsuario);
+    Usuario save(Usuario newuUsuario);
 
-    public void deleteById(Long id);
+    void deleteById(Long id);
 
-    public Usuario update (Usuario newUsuario, Long id);
+    Usuario update (Usuario newUsuario, Long id);
 
     Optional<Usuario> login(String correo, String contrasenia);
 
-    public Long findByMail(String correo) throws MessagingException;
+    Long findByMail(String correo) throws MessagingException;
 
-    public void enviarCodigoVerificacion(String correo) throws MessagingException;
+    void enviarCodigoVerificacion(String correo) throws MessagingException;
 
-    public String obtenerCodigoVerificacion();
-    
+    String obtenerCodigoVerificacion();
+
+    // ==== NUEVO: asignación de rol existente ====
+    Usuario assignRole(Long userId, Long roleId, String roleName);
+
+    Usuario removeRole(Long userId);
+
 }

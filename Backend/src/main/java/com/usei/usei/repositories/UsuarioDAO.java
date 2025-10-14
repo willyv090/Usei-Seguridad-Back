@@ -1,17 +1,15 @@
 package com.usei.usei.repositories;
 
 import java.util.Optional;
-
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
-
+import org.springframework.data.repository.CrudRepository;
 import com.usei.usei.models.Usuario;
 
-@Repository
-public interface UsuarioDAO extends  JpaRepository<Usuario, Long> {
+public interface UsuarioDAO extends CrudRepository<Usuario, Long> {
 
     Optional<Usuario> findByCorreoAndContrasenia(String correo, String contrasenia);
 
     Usuario findByCorreo(String correo);
 
+    // Necesario para bloquear el borrado de un rol en uso por algún usuario
+    long countByRolEntity_IdRol(Long idRol);
 }
