@@ -1,5 +1,5 @@
 -- Created by Redgate Data Modeler (https://datamodeler.redgate-platform.com)
--- Last modification date: 2025-10-09 14:39:13.786
+-- Last modification date: 2025-10-14 13:12:40.052
 
 -- tables
 -- Table: Certificado
@@ -259,6 +259,8 @@ CREATE TABLE Respuesta (
 CREATE TABLE Roles (
     id_rol serial  NOT NULL,
     nombre_rol varchar(50)  NOT NULL,
+    activo boolean  NOT NULL,
+    accesos int  NOT NULL,
     CONSTRAINT Roles_pk PRIMARY KEY (id_rol)
 );
 
