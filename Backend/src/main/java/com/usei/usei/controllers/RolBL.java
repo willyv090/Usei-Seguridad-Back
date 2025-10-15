@@ -41,4 +41,13 @@ public class RolBL {
         return rolDAO.findAll();
     }
 
+    public Rol cambiarEstadoRol(Long idRol, boolean nuevoEstado) {
+        Rol rol = rolDAO.findById(idRol)
+                .orElseThrow(() -> new RuntimeException("Rol no encontrado con ID: " + idRol));
+
+        rol.setActivo(nuevoEstado);
+        return rolDAO.save(rol);
+    }
+
+
 }

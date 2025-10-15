@@ -299,5 +299,27 @@ public class UsuarioAPI {
         }
     }
 
+    // ---------- Actualizar estado (activar/desactivar rol) ----------
+    @PutMapping("/rol/{idRol}/estado")
+    public ResponseEntity<?> actualizarEstadoRol(@PathVariable Long idRol, @RequestBody Map<String, Object> body) {
+        try {
+            if (!body.containsKey("activo")) {
+                return ResponseEntity.badRequest().body("Campo 'activo' es obligatorio.");
+            }
+
+            boolean nuevoEstado = Boolean.parseBoolean(String.valueOf(body.get("activo")));
+            Rol rolActualizado = rolBL.cambiarEstadoRol(idRol, nuevoEstado);
+
+            return ResponseEntity.ok(rolActualizado);
+        } catch (RuntimeException ex) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("Error al cambiar el estado del rol: " + ex.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error inesperado: " + e.getMessage());
+        }
+    }
+
+
 
 }
