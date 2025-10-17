@@ -288,19 +288,26 @@ CREATE TABLE Tipo_Problema (
     CONSTRAINT Tipo_Problema_pk PRIMARY KEY (id_problema)
 );
 
--- Table: Usuario
 CREATE TABLE Usuario (
-    id_usuario serial  NOT NULL,
-    nombre varchar(50)  NOT NULL,
-    telefono int  NOT NULL,
-    correo varchar(40)  NOT NULL,
-    carrera varchar(40)  NOT NULL,
-    rol varchar(20)  NOT NULL,
-    usuario varchar(30)  NOT NULL,
-    Roles_id_rol int  NOT NULL,
-    Contrasenia_id_pass int  NOT NULL,
-    CONSTRAINT Usuario_pk PRIMARY KEY (id_usuario)
+    id_usuario SERIAL NOT NULL,
+    nombre VARCHAR(50) NOT NULL,
+    apellido VARCHAR(50) NOT NULL,
+    telefono INT NOT NULL,
+    correo VARCHAR(40) NOT NULL,
+    carrera VARCHAR(40) NOT NULL,
+    rol VARCHAR(20) NOT NULL,
+    ci VARCHAR(20) NOT NULL UNIQUE, -- CI será el identificador único (UserID)
+    contrasenia VARCHAR(50),        -- Contraseña temporal o actual
+    cambio_contrasenia BOOLEAN DEFAULT TRUE,
+    Roles_id_rol INT NOT NULL,
+    Contrasenia_id_pass INT,
+    CONSTRAINT Usuario_pk PRIMARY KEY (id_usuario),
+    CONSTRAINT fk_usuario_rol FOREIGN KEY (Roles_id_rol) REFERENCES Roles (id_rol),
+    CONSTRAINT fk_usuario_contrasenia FOREIGN KEY (Contrasenia_id_pass) REFERENCES Contrasenia (id_pass)
 );
+
+
+
 
 -- foreign keys
 -- Reference: Certificado_Usuario (table: Certificado)

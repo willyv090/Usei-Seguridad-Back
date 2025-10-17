@@ -41,43 +41,65 @@ public class UsuarioBL implements UsuarioService {
 
     @Override
     @Transactional(readOnly = true)
-    public Iterable<Usuario> findAll() { return usuarioDAO.findAll(); }
+    public Iterable<Usuario> findAll() {
+        return usuarioDAO.findAll();
+    }
 
     @Override
     @Transactional(readOnly = true)
-    public Optional<Usuario> findById(Long id) { return usuarioDAO.findById(id); }
+    public Optional<Usuario> findById(Long id) {
+        return usuarioDAO.findById(id);
+    }
 
     @Override
     @Transactional
-    public Usuario save(Usuario usuario) { return usuarioDAO.save(usuario); }
+    public Usuario save(Usuario usuario) {
+        // 🔹 Validar duplicado de CI
+        if (usuarioDAO.existsByCi(usuario.getCi())) {
+            throw new RuntimeException("Ya existe un usuario con el CI " + usuario.getCi());
+        }
+
+        // 🔹 Si no tiene contraseña, generarla automáticamente
+        if (usuario.getContrasenia() == null || usuario.getContrasenia().isBlank()) {
+            String contraseniaGenerada = (usuario.getNombre().substring(0, 1)
+                    + usuario.getApellido().substring(0, 1)
+                    + usuario.getCi()).toUpperCase();
+            usuario.setContrasenia(contraseniaGenerada);
+            usuario.setCambioContrasenia(true);
+        }
+
+        return usuarioDAO.save(usuario);
+    }
 
     @Override
     @Transactional
-    public void deleteById(Long id) { usuarioDAO.deleteById(id); }
+    public void deleteById(Long id) {
+        usuarioDAO.deleteById(id);
+    }
 
     @Override
     @Transactional
     public Usuario update(Usuario usuario, Long id) {
         Usuario usuarioToUpdate = usuarioDAO.findById(id)
-                .orElseThrow(() -> new RuntimeException("Persona no encontrada con el id: " + id));
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado con id: " + id));
 
         usuarioToUpdate.setNombre(usuario.getNombre());
+        usuarioToUpdate.setApellido(usuario.getApellido());
         usuarioToUpdate.setTelefono(usuario.getTelefono());
         usuarioToUpdate.setCorreo(usuario.getCorreo());
         usuarioToUpdate.setCarrera(usuario.getCarrera());
-        usuarioToUpdate.setUsuario(usuario.getUsuario());
+        usuarioToUpdate.setCi(usuario.getCi());
         usuarioToUpdate.setContrasenia(usuario.getContrasenia());
+        usuarioToUpdate.setCambioContrasenia(usuario.getCambioContrasenia());
 
         // Mantienes también el campo texto 'rol' (varchar)
         try { usuarioToUpdate.setRol(usuario.getRol()); } catch (Exception ignored) {}
 
         // Si te envían la relación ya resuelta (no obligatorio)
-        try {
-            if (usuario.getRolEntity() != null) {
-                usuarioToUpdate.setRolEntity(usuario.getRolEntity());
-                try { usuarioToUpdate.setRol(usuario.getRolEntity().getNombreRol()); } catch (Exception ignored) {}
-            }
-        } catch (Exception ignored) {}
+        if (usuario.getRolEntity() != null) {
+            usuarioToUpdate.setRolEntity(usuario.getRolEntity());
+            try { usuarioToUpdate.setRol(usuario.getRolEntity().getNombreRol()); } catch (Exception ignored) {}
+        }
 
         return usuarioDAO.save(usuarioToUpdate);
     }
@@ -108,9 +130,9 @@ public class UsuarioBL implements UsuarioService {
         Usuario usuario = usuarioDAO.findByCorreo(correo);
         if (usuario == null) throw new MessagingException("No existe usuario con correo: " + correo);
 
-        String asunto = "Codigo de Seguridad para cambio de contraseña";
-        String mensaje = "Estimado Director, usted ha solicitado un cambio de contraseña, "
-                + "por favor ingrese el siguiente código de seguridad: ";
+        String asunto = "Código de seguridad para cambio de contraseña";
+        String mensaje = "Estimado usuario, ha solicitado un cambio de contraseña. "
+                + "Por favor ingrese el siguiente código de seguridad: ";
 
         this.codigoVerificacion = generarCodigoVerificacion();
         String cuerpoCorreo = mensaje + this.codigoVerificacion;
@@ -127,7 +149,9 @@ public class UsuarioBL implements UsuarioService {
     }
 
     @Override
-    public String obtenerCodigoVerificacion() { return this.codigoVerificacion; }
+    public String obtenerCodigoVerificacion() {
+        return this.codigoVerificacion;
+    }
 
     private void enviarCorreo(String to, String subject, String body) throws MessagingException {
         MimeMessage message = mailSender.createMimeMessage();
@@ -158,7 +182,6 @@ public class UsuarioBL implements UsuarioService {
             throw new RuntimeException("Debes enviar roleId o roleName");
         }
 
-        // Respetar tu BD: actualizar FK y el string 'rol'
         user.setRolEntity(rol);
         try { user.setRol(rol.getNombreRol()); } catch (Exception ignored) {}
 
@@ -175,10 +198,17 @@ public class UsuarioBL implements UsuarioService {
                 .orElseGet(() -> rolDAO.save(new Rol("SIN_ROL")));
 
         user.setRolEntity(sinRol);
-        // sincroniza el varchar 'rol' para respetar tu BD
         try { user.setRol(sinRol.getNombreRol()); } catch (Exception ignored) {}
 
         return usuarioDAO.save(user);
+    }
+
+    /* ==========================
+       NUEVO: verificar duplicado de CI
+       ========================== */
+    @Override
+    public boolean existsByCi(String ci) {
+        return usuarioDAO.existsByCi(ci);
     }
 
 }

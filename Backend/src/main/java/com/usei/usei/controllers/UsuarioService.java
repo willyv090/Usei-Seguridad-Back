@@ -3,7 +3,6 @@ package com.usei.usei.controllers;
 import java.util.Optional;
 
 import com.usei.usei.models.Usuario;
-
 import jakarta.mail.MessagingException;
 
 public interface UsuarioService {
@@ -12,11 +11,11 @@ public interface UsuarioService {
 
     Optional<Usuario> findById(Long id);
 
-    Usuario save(Usuario newuUsuario);
+    Usuario save(Usuario newUsuario);
 
     void deleteById(Long id);
 
-    Usuario update (Usuario newUsuario, Long id);
+    Usuario update(Usuario newUsuario, Long id);
 
     Optional<Usuario> login(String correo, String contrasenia);
 
@@ -31,4 +30,6 @@ public interface UsuarioService {
 
     Usuario removeRole(Long userId);
 
+    // ==== NUEVO: verificar duplicado de CI ====
+    boolean existsByCi(String ci);
 }

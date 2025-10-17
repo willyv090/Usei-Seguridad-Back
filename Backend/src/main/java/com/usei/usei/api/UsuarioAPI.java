@@ -41,12 +41,57 @@ public class UsuarioAPI {
     // ====== CRUD ======
 
     @PostMapping
-    public ResponseEntity<?> create(@RequestBody Usuario usuario) {
-        Usuario saved = usuarioService.save(usuario);
-        // Nunca retornar contraseñas
-        saved.setContrasenia(null);
-        return ResponseEntity.status(HttpStatus.CREATED).body(saved);
+    public ResponseEntity<?> create(@RequestBody Map<String, Object> body) {
+        try {
+            // Validaciones básicas
+            if (!body.containsKey("nombre") || !body.containsKey("apellido") || !body.containsKey("ci") || !body.containsKey("idRol")) {
+                return ResponseEntity.badRequest().body("Faltan campos obligatorios: nombre, apellido, ci, idRol");
+            }
+
+            String nombre = body.get("nombre").toString().trim();
+            String apellido = body.get("apellido").toString().trim();
+            String ci = body.get("ci").toString().trim();
+            int telefono = body.get("telefono") != null ? Integer.parseInt(body.get("telefono").toString()) : 0;
+            String correo = body.get("correo") != null ? body.get("correo").toString().trim() : "";
+            String carrera = body.get("carrera") != null ? body.get("carrera").toString().trim() : "";
+
+            Long idRol = Long.parseLong(body.get("idRol").toString());
+            Rol rol = rolBL.obtenerRolPorId(idRol);
+
+            if (rol == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("El rol especificado no existe.");
+            }
+
+            // Generar contraseña por defecto (ej: CN1234567)
+            String contraseniaGenerada = (nombre.substring(0, 1) + apellido.substring(0, 1) + ci).toUpperCase();
+
+            // Crear usuario
+            Usuario nuevoUsuario = new Usuario();
+            nuevoUsuario.setNombre(nombre);
+            nuevoUsuario.setApellido(apellido);
+            nuevoUsuario.setCi(ci);
+            nuevoUsuario.setTelefono(telefono);
+            nuevoUsuario.setCorreo(correo);
+            nuevoUsuario.setCarrera(carrera);
+            nuevoUsuario.setRol(rol.getNombreRol());
+            nuevoUsuario.setRolEntity(rol);
+            nuevoUsuario.setContrasenia(contraseniaGenerada);
+            nuevoUsuario.setCambioContrasenia(true);
+
+            Usuario saved = usuarioService.save(nuevoUsuario);
+
+            // No exponer contraseña
+            saved.setContrasenia(null);
+
+            return ResponseEntity.status(HttpStatus.CREATED).body(saved);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error al crear usuario: " + e.getMessage());
+        }
     }
+
 
     @GetMapping("/{id_usuario}")
     public ResponseEntity<?> read(@PathVariable("id_usuario") Long idUsuario) {
@@ -79,13 +124,12 @@ public class UsuarioAPI {
         if (oUsuario.isEmpty()) return ResponseEntity.notFound().build();
 
         oUsuario.get().setNombre(usuario.getNombre());
+        oUsuario.get().setApellido(usuario.getApellido());
         oUsuario.get().setTelefono(usuario.getTelefono());
         oUsuario.get().setCorreo(usuario.getCorreo());
         oUsuario.get().setCarrera(usuario.getCarrera());
-        // si sigues usando el varchar 'rol', lo mantienes
         oUsuario.get().setRol(usuario.getRol());
-        oUsuario.get().setUsuario(usuario.getUsuario());
-        oUsuario.get().setContrasenia(usuario.getContrasenia());
+        oUsuario.get().setCi(usuario.getCi());
 
         Usuario updated = usuarioService.save(oUsuario.get());
         updated.setContrasenia(null);
@@ -127,7 +171,7 @@ public class UsuarioAPI {
                 data.put("correo", user.getCorreo());
                 data.put("carrera", user.getCarrera());
                 data.put("nombre", user.getNombre());
-                data.put("usuario", user.getUsuario());
+                data.put("ci", user.getCi());
 
                 SuccessfulResponse response = new SuccessfulResponse(
                         "200 OK",

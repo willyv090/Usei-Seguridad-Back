@@ -49,5 +49,10 @@ public class RolBL {
         return rolDAO.save(rol);
     }
 
+    //Obtener el rol mediante su ID
+    public Rol obtenerRolPorId(Long idRol) {
+        return rolDAO.findById(idRol).orElse(null);
+    }
+
 
 }

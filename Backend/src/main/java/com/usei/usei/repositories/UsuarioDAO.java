@@ -10,6 +10,8 @@ public interface UsuarioDAO extends CrudRepository<Usuario, Long> {
 
     Usuario findByCorreo(String correo);
 
+    boolean existsByCi(String ci);
+
     // Necesario para bloquear el borrado de un rol en uso por algún usuario
     long countByRolEntity_IdRol(Long idRol);
 }
