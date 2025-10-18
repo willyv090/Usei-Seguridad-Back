@@ -46,31 +46,71 @@ public class UsuarioBL implements UsuarioService {
     @Override
     @Transactional
     public Usuario save(Usuario usuario) {
-        // 🔹 Verificar duplicado solo si el CI pertenece a OTRO usuario
+        // 🔹 Evitar duplicados de CI en otros usuarios
         Optional<Usuario> existente = usuarioDAO.findByCi(usuario.getCi());
         if (existente.isPresent() && !existente.get().getIdUsuario().equals(usuario.getIdUsuario())) {
             throw new RuntimeException("Ya existe un usuario con el CI " + usuario.getCi());
         }
 
-        // 🔹 Si no tiene contraseña asociada, generar una por defecto
+        // 🔹 Generar contraseña por defecto si no tiene
         if (usuario.getContraseniaEntity() == null) {
-            String pass = (usuario.getNombre().substring(0, 1)
-                    + usuario.getApellido().substring(0, 1)
-                    + usuario.getCi()).toUpperCase();
+            String nombre = usuario.getNombre().trim();
+            String apellido = usuario.getApellido().trim();
+            String ci = usuario.getCi().trim();
 
+            // Ejemplo: Rosario Calisaya 9172358 → Rc9172358
+            String inicialNombre = nombre.substring(0, 1).toUpperCase();
+            String apellidoMin = apellido.toLowerCase().replaceAll("\\s+", "");
+            String contraseniaGenerada = inicialNombre + apellidoMin + ci;
+
+            // Crear entidad de contraseña
             Contrasenia contrasenia = new Contrasenia();
-            contrasenia.setContrasenia(pass);
+            contrasenia.setContrasenia(contraseniaGenerada);
             contrasenia.setFechaCreacion(LocalDate.now());
-            contrasenia.setLongitud(pass.length());
+            contrasenia.setLongitud(contraseniaGenerada.length());
             contrasenia.setComplejidad(1);
             contrasenia.setIntentosRestantes(3);
             contrasenia.setUltimoLog(LocalDate.now());
 
             contrasenia = contraseniaDAO.save(contrasenia);
             usuario.setContraseniaEntity(contrasenia);
+
+            // Marcar que debe cambiarla al ingresar
+            usuario.setCambioContrasenia(true);
+
+            // 🔹 Enviar correo de notificación (solo si tiene correo)
+            if (usuario.getCorreo() != null && !usuario.getCorreo().isBlank()) {
+                try {
+                    String cuerpo = """
+                    Estimado/a %s %s,
+                    
+                    Su cuenta ha sido creada exitosamente para el Sistema de Encuesta a Tiempo de Graduación USEI.
+                    
+                    Sus credenciales iniciales son:
+                    Usuario: %s
+                    Contraseña: %s
+                    
+                    Por seguridad, deberá cambiar su contraseña en su primer inicio de sesión.
+                    
+                    Saludos cordiales,
+                    Equipo USEI
+                    Universidad Católica Boliviana "San Pablo"
+                    """.formatted(
+                            usuario.getNombre(),
+                            usuario.getApellido(),
+                            ci,
+                            contraseniaGenerada
+                    );
+
+                    enviarCorreo(usuario.getCorreo(), "Credenciales de acceso - Encuesta a tiempo de graduación USEI", cuerpo);
+                    System.out.println("Correo enviado correctamente a " + usuario.getCorreo());
+                } catch (Exception e) {
+                    System.err.println("Error al enviar correo a " + usuario.getCorreo() + ": " + e.getMessage());
+                }
+            }
         }
 
-        usuario.setCambioContrasenia(true);
+        // 🔹 Guardar usuario
         return usuarioDAO.save(usuario);
     }
 
@@ -192,6 +232,48 @@ public class UsuarioBL implements UsuarioService {
         user.setRol(sinRol.getNombreRol());
         return usuarioDAO.save(user);
     }
+
+    // ==========================
+// ENVÍO DE CREDENCIALES MANUAL
+// ==========================
+    public void enviarCredencialesUsuario(Usuario usuario) {
+        try {
+            if (usuario == null)
+                throw new RuntimeException("Usuario no válido.");
+
+            String nombre = usuario.getNombre();
+            String apellido = usuario.getApellido();
+            String ci = usuario.getCi();
+
+            // Generar la contraseña según el patrón
+            String inicialNombre = nombre.substring(0, 1).toUpperCase();
+            String apellidoMin = apellido.toLowerCase().replaceAll("\\s+", "");
+            String contraseniaGenerada = inicialNombre + apellidoMin + ci;
+
+            // Construir cuerpo del correo
+            String cuerpo = """
+            Estimado/a %s %s,
+            
+            Sus credenciales de acceso al Sistema USEI son:
+            
+            Usuario: %s
+            Contraseña: %s
+            
+            Por seguridad, deberá cambiar su contraseña al ingresar por primera vez.
+            
+            Saludos cordiales,
+            Equipo USEI
+            Universidad Católica Boliviana "San Pablo"
+            """.formatted(nombre, apellido, ci, contraseniaGenerada);
+
+            enviarCorreo(usuario.getCorreo(), "Reenvío de credenciales - Sistema USEI", cuerpo);
+            System.out.println("📧 Credenciales reenviadas a " + usuario.getCorreo());
+        } catch (Exception e) {
+            System.err.println("❌ Error al enviar credenciales: " + e.getMessage());
+            throw new RuntimeException("Error al enviar credenciales: " + e.getMessage());
+        }
+    }
+
 
     @Override
     public boolean existsByCi(String ci) { return usuarioDAO.existsByCi(ci); }

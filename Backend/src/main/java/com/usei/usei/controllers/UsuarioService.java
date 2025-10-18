@@ -25,6 +25,9 @@ public interface UsuarioService {
 
     String obtenerCodigoVerificacion();
 
+    // ==== NUEVO: envío manual de credenciales ====
+    void enviarCredencialesUsuario(Usuario usuario);
+
     // ==== NUEVO: asignación de rol existente ====
     Usuario assignRole(Long userId, Long roleId, String roleName);
 

@@ -249,6 +249,27 @@ public class UsuarioAPI {
             }
         }
 
+    @PostMapping("/{id}/enviarCredenciales")
+    public ResponseEntity<?> enviarCredenciales(@PathVariable Long id) {
+        try {
+            Optional<Usuario> oUsuario = usuarioService.findById(id);
+            if (oUsuario.isEmpty())
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body("Usuario no encontrado con ID: " + id);
+
+            Usuario usuario = oUsuario.get();
+            usuarioService.enviarCredencialesUsuario(usuario);
+
+            return ResponseEntity.ok("Credenciales enviadas correctamente a " + usuario.getCorreo());
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error al enviar credenciales: " + e.getMessage());
+        }
+    }
+
+
+
 
     // ===========================
     // CAMBIAR CONTRASEÑA
