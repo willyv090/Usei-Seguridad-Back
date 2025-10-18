@@ -1,5 +1,5 @@
 -- Created by Redgate Data Modeler (https://datamodeler.redgate-platform.com)
--- Last modification date: 2025-10-14 13:12:40.052
+-- Last modification date: 2025-10-18 02:41:59.666
 
 -- tables
 -- Table: Certificado
@@ -96,6 +96,20 @@ CREATE TABLE H_Certificado (
     tx_date timestamp  NOT NULL,
     tx_user int  NOT NULL,
     CONSTRAINT H_Certificado_pk PRIMARY KEY (id_certificado)
+);
+
+-- Table: H_Contrasenia
+CREATE TABLE H_Contrasenia (
+    id_pass serial  NOT NULL,
+    contrasenia varchar(30)  NOT NULL,
+    fecha_creacion date  NOT NULL,
+    longitud int  NOT NULL,
+    complejidad int  NOT NULL,
+    intentos_restantes int  NOT NULL,
+    ultimo_log date  NOT NULL,
+    tx_date timestamp  NOT NULL,
+    tx_user int  NOT NULL,
+    CONSTRAINT H_Contrasenia_pk PRIMARY KEY (id_pass)
 );
 
 -- Table: H_Estudiante
@@ -255,13 +269,13 @@ CREATE TABLE Respuesta (
     CONSTRAINT Respuesta_pk PRIMARY KEY (id_respuesta)
 );
 
--- Table: roles
-CREATE TABLE roles (
-    id_rol SERIAL NOT NULL,
-    nombre_rol VARCHAR(50) NOT NULL,
-    activo BOOLEAN NOT NULL DEFAULT TRUE,
-    accesos VARCHAR(100)[] DEFAULT '{}',
-    CONSTRAINT roles_pk PRIMARY KEY (id_rol)
+-- Table: Roles
+CREATE TABLE Roles (
+    id_rol serial  NOT NULL,
+    nombre_rol varchar(50)  NOT NULL,
+    activo boolean  NOT NULL,
+    accesos int  NOT NULL,
+    CONSTRAINT Roles_pk PRIMARY KEY (id_rol)
 );
 
 -- Table: Soporte
@@ -288,26 +302,20 @@ CREATE TABLE Tipo_Problema (
     CONSTRAINT Tipo_Problema_pk PRIMARY KEY (id_problema)
 );
 
+-- Table: Usuario
 CREATE TABLE Usuario (
-    id_usuario SERIAL NOT NULL,
-    nombre VARCHAR(50) NOT NULL,
-    apellido VARCHAR(50) NOT NULL,
-    telefono INT NOT NULL,
-    correo VARCHAR(40) NOT NULL,
-    carrera VARCHAR(40) NOT NULL,
-    rol VARCHAR(20) NOT NULL,
-    ci VARCHAR(20) NOT NULL UNIQUE, -- CI será el identificador único (UserID)
-    contrasenia VARCHAR(50),        -- Contraseña temporal o actual
-    cambio_contrasenia BOOLEAN DEFAULT TRUE,
-    Roles_id_rol INT NOT NULL,
-    Contrasenia_id_pass INT,
-    CONSTRAINT Usuario_pk PRIMARY KEY (id_usuario),
-    CONSTRAINT fk_usuario_rol FOREIGN KEY (Roles_id_rol) REFERENCES Roles (id_rol),
-    CONSTRAINT fk_usuario_contrasenia FOREIGN KEY (Contrasenia_id_pass) REFERENCES Contrasenia (id_pass)
+    id_usuario serial  NOT NULL,
+    nombre varchar(50)  NOT NULL,
+    apellido varchar(50)  NOT NULL,
+    telefono int  NOT NULL,
+    correo varchar(40)  NOT NULL,
+    carrera varchar(40)  NOT NULL,
+    rol varchar(20)  NOT NULL,
+    ci varchar(20)  NOT NULL,
+    Roles_id_rol int  NOT NULL,
+    Contrasenia_id_pass int  NOT NULL,
+    CONSTRAINT Usuario_pk PRIMARY KEY (id_usuario)
 );
-
-
-
 
 -- foreign keys
 -- Reference: Certificado_Usuario (table: Certificado)

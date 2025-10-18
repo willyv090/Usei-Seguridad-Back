@@ -60,13 +60,9 @@ public class UsuarioBL implements UsuarioService {
         }
 
         // 🔹 Si no tiene contraseña, generarla automáticamente
-        if (usuario.getContrasenia() == null || usuario.getContrasenia().isBlank()) {
-            String contraseniaGenerada = (usuario.getNombre().substring(0, 1)
-                    + usuario.getApellido().substring(0, 1)
-                    + usuario.getCi()).toUpperCase();
-            usuario.setContrasenia(contraseniaGenerada);
-            usuario.setCambioContrasenia(true);
-        }
+        if (usuario.getContraseniaEntity() == null)
+            throw new RuntimeException("El usuario debe tener asignada una contraseña válida.");
+
 
         return usuarioDAO.save(usuario);
     }

@@ -95,6 +95,12 @@ public class Usuario implements Serializable {
     @JsonIgnore
     private Collection<Plazo> plazoCollection;
 
+    // Nueva relación hacia la tabla Contrasenia
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "Contrasenia_id_pass", referencedColumnName = "id_pass")
+    private Contrasenia contraseniaEntity;
+
+
     // ====== Constructores ======
     public Usuario() {}
 
@@ -183,4 +189,13 @@ public class Usuario implements Serializable {
     public String toString() {
         return "com.usei.usei.Usuario[ idUsuario=" + idUsuario + " ]";
     }
+
+    public Contrasenia getContraseniaEntity() {
+        return contraseniaEntity;
+    }
+
+    public void setContraseniaEntity(Contrasenia contraseniaEntity) {
+        this.contraseniaEntity = contraseniaEntity;
+    }
+
 }

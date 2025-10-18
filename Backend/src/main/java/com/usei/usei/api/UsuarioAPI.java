@@ -4,6 +4,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
+import com.usei.usei.models.Contrasenia;
+import com.usei.usei.repositories.ContraseniaDAO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -38,14 +40,20 @@ public class UsuarioAPI {
     @Autowired
     private RolBL rolBL;
 
+    @Autowired
+    private ContraseniaDAO contraseniaDAO;
+
+
     // ====== CRUD ======
 
     @PostMapping
     public ResponseEntity<?> create(@RequestBody Map<String, Object> body) {
         try {
             // Validaciones básicas
-            if (!body.containsKey("nombre") || !body.containsKey("apellido") || !body.containsKey("ci") || !body.containsKey("idRol")) {
-                return ResponseEntity.badRequest().body("Faltan campos obligatorios: nombre, apellido, ci, idRol");
+            if (!body.containsKey("nombre") || !body.containsKey("apellido") ||
+                    !body.containsKey("ci") || !body.containsKey("idRol")) {
+                return ResponseEntity.badRequest()
+                        .body("Faltan campos obligatorios: nombre, apellido, ci, idRol");
             }
 
             String nombre = body.get("nombre").toString().trim();
@@ -57,15 +65,19 @@ public class UsuarioAPI {
 
             Long idRol = Long.parseLong(body.get("idRol").toString());
             Rol rol = rolBL.obtenerRolPorId(idRol);
-
-            if (rol == null) {
+            if (rol == null)
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("El rol especificado no existe.");
-            }
 
-            // Generar contraseña por defecto (ej: CN1234567)
+            // 1️⃣ Generar contraseña por defecto (ej: CN123456)
             String contraseniaGenerada = (nombre.substring(0, 1) + apellido.substring(0, 1) + ci).toUpperCase();
 
-            // Crear usuario
+            // 2️⃣ Crear entidad de contraseña
+            Contrasenia nuevaPass = new Contrasenia(contraseniaGenerada, contraseniaGenerada.length(), 1);
+
+            // Guardar en BD (usa el nuevo DAO)
+            Contrasenia savedPass = contraseniaDAO.save(nuevaPass);
+
+            // 3️⃣ Crear usuario y asignarle la FK
             Usuario nuevoUsuario = new Usuario();
             nuevoUsuario.setNombre(nombre);
             nuevoUsuario.setApellido(apellido);
@@ -75,14 +87,10 @@ public class UsuarioAPI {
             nuevoUsuario.setCarrera(carrera);
             nuevoUsuario.setRol(rol.getNombreRol());
             nuevoUsuario.setRolEntity(rol);
-            nuevoUsuario.setContrasenia(contraseniaGenerada);
+            nuevoUsuario.setContraseniaEntity(savedPass);
             nuevoUsuario.setCambioContrasenia(true);
 
             Usuario saved = usuarioService.save(nuevoUsuario);
-
-            // No exponer contraseña
-            saved.setContrasenia(null);
-
             return ResponseEntity.status(HttpStatus.CREATED).body(saved);
 
         } catch (Exception e) {
