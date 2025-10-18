@@ -2,6 +2,7 @@ package com.usei.usei.api;
 
 import java.util.*;
 
+import com.usei.usei.dto.response.UsuarioResponseDTO;
 import com.usei.usei.models.Contrasenia;
 import com.usei.usei.repositories.ContraseniaDAO;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -113,17 +114,31 @@ public class UsuarioAPI {
     @GetMapping
     public ResponseEntity<?> readAll() {
         try {
-            List<Usuario> usuarios = new ArrayList<>();
+            List<UsuarioResponseDTO> usuarios = new ArrayList<>();
             usuarioService.findAll().forEach(u -> {
-                u.setContraseniaEntity(null); // ocultar contraseñas
-                usuarios.add(u);
+                String rol = (u.getRol() != null && !u.getRol().isBlank())
+                        ? u.getRol()
+                        : (u.getRolEntity() != null ? u.getRolEntity().getNombreRol() : "SIN_ROL");
+
+                usuarios.add(new UsuarioResponseDTO(
+                        u.getIdUsuario(),
+                        u.getNombre(),
+                        u.getApellido(),
+                        u.getCorreo(),
+                        u.getCi(),
+                        u.getTelefono(),
+                        u.getCarrera(),
+                        rol
+                ));
             });
-            return ResponseEntity.ok(usuarios); // ✅ devolver lista JSON
+
+            return ResponseEntity.ok(usuarios);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error al listar usuarios: " + e.getMessage());
         }
     }
+
 
 
     // ===========================
