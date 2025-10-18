@@ -54,5 +54,12 @@ public class RolBL {
         return rolDAO.findById(idRol).orElse(null);
     }
 
+    // 🔹 Obtener rol por nombre
+    @Transactional(readOnly = true)
+    public Rol obtenerRolPorNombre(String nombreRol) {
+        if (nombreRol == null || nombreRol.isBlank()) return null;
+        return rolDAO.findByNombreRol(nombreRol).orElse(null);
+    }
+
 
 }

@@ -139,8 +139,6 @@ public class UsuarioAPI {
         }
     }
 
-
-
     // ===========================
     // ELIMINAR USUARIO
     // ===========================
@@ -154,7 +152,7 @@ public class UsuarioAPI {
     }
 
     // ===========================
-    // ACTUALIZAR USUARIO
+    // ACTUALIZAR USUARIO (TOTAL)
     // ===========================
     @PutMapping("/{id_usuario}")
     public ResponseEntity<?> update(@PathVariable("id_usuario") Long idUsuario, @RequestBody Usuario usuario) {
@@ -174,6 +172,83 @@ public class UsuarioAPI {
         updated.setContraseniaEntity(null);
         return ResponseEntity.status(HttpStatus.CREATED).body(updated);
     }
+
+    // ===========================
+    // ACTUALIZAR USUARIO (PARCIAL - PATCH)
+    // ===========================
+    @PatchMapping("/{id_usuario}")
+        public ResponseEntity<?> editarUsuario(
+                @PathVariable("id_usuario") Long idUsuario,
+                @RequestBody Map<String, Object> body) {
+            try {
+                Optional<Usuario> oUsuario = usuarioService.findById(idUsuario);
+                if (oUsuario.isEmpty())
+                    return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Usuario no encontrado.");
+
+                Usuario u = oUsuario.get();
+
+                // 🔹 Actualiza solo los campos enviados
+                if (body.containsKey("nombre")) u.setNombre((String) body.get("nombre"));
+                if (body.containsKey("apellido")) u.setApellido((String) body.get("apellido"));
+                if (body.containsKey("ci")) u.setCi((String) body.get("ci"));
+                if (body.containsKey("correo")) u.setCorreo((String) body.get("correo"));
+
+                if (body.containsKey("telefono")) {
+                    String telStr = String.valueOf(body.get("telefono"));
+                    if (telStr != null && !telStr.isBlank() && !telStr.equals("null")) {
+                        try {
+                            u.setTelefono(Integer.parseInt(telStr));
+                        } catch (NumberFormatException ex) {
+                            return ResponseEntity.badRequest()
+                                    .body("El campo 'telefono' debe ser numérico.");
+                        }
+                    }
+                }
+
+                if (body.containsKey("carrera")) u.setCarrera((String) body.get("carrera"));
+
+                // 🔹 Actualizar rol si llega idRol o rol
+                if (body.containsKey("idRol") || body.containsKey("rol")) {
+                    Rol nuevoRol = null;
+
+                    if (body.containsKey("idRol")) {
+                        String idRolStr = String.valueOf(body.get("idRol"));
+                        if (idRolStr != null && !idRolStr.isBlank() && !idRolStr.equals("null")) {
+                            try {
+                                Long idRol = Long.parseLong(idRolStr);
+                                nuevoRol = rolBL.obtenerRolPorId(idRol);
+                            } catch (NumberFormatException ex) {
+                                return ResponseEntity.badRequest()
+                                        .body("El campo 'idRol' debe ser un número válido.");
+                            }
+                        }
+                    } else if (body.containsKey("rol")) {
+                        String nombreRol = String.valueOf(body.get("rol"));
+                        if (nombreRol != null && !nombreRol.isBlank()) {
+                            nuevoRol = rolBL.obtenerRolPorNombre(nombreRol);
+                        }
+                    }
+
+                    if (nuevoRol == null) {
+                        return ResponseEntity.badRequest()
+                                .body("El rol especificado no existe o no es válido.");
+                    }
+
+                    u.setRolEntity(nuevoRol);
+                    u.setRol(nuevoRol.getNombreRol());
+                }
+
+                Usuario actualizado = usuarioService.save(u);
+                actualizado.setContraseniaEntity(null);
+                return ResponseEntity.ok(actualizado);
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body("Error al actualizar usuario: " + e.getMessage());
+            }
+        }
+
 
     // ===========================
     // CAMBIAR CONTRASEÑA
@@ -276,121 +351,6 @@ public class UsuarioAPI {
     // ===========================
     // ROLES
     // ===========================
-    public static class CrearRolRequest {
-        private String nombreRol;
-        private Object activo;
-        private java.util.List<String> accesos;
-
-        public String getNombreRol() { return nombreRol; }
-        public void setNombreRol(String nombreRol) { this.nombreRol = nombreRol; }
-        public Object getActivo() { return activo; }
-        public void setActivo(Object activo) { this.activo = activo; }
-        public java.util.List<String> getAccesos() { return accesos; }
-        public void setAccesos(java.util.List<String> accesos) { this.accesos = accesos; }
-    }
-
-    private Boolean normalizeActivo(Object v) {
-        if (v == null) return Boolean.TRUE;
-        if (v instanceof Boolean) return (Boolean) v;
-        String s = String.valueOf(v).trim();
-        if (s.equalsIgnoreCase("SI") || s.equalsIgnoreCase("TRUE") || s.equals("1")) return true;
-        if (s.equalsIgnoreCase("NO") || s.equalsIgnoreCase("FALSE") || s.equals("0")) return false;
-        return Boolean.TRUE;
-    }
-
-    @PostMapping("/rol")
-    public ResponseEntity<?> crearRol(@RequestBody(required = false) CrearRolRequest req) {
-        try {
-            if (req == null) {
-                return ResponseEntity.badRequest().body("El cuerpo de la solicitud está vacío o malformado.");
-            }
-
-            if (req.getNombreRol() == null || req.getNombreRol().isBlank()) {
-                return ResponseEntity.badRequest().body("El nombre del rol es obligatorio.");
-            }
-
-            Boolean activo = normalizeActivo(req.getActivo());
-
-            // 🔹 Convertir lista de accesos a texto
-            String accesosStr = "";
-            if (req.getAccesos() != null && !req.getAccesos().isEmpty()) {
-                accesosStr = String.join(",", req.getAccesos());
-            }
-
-            Rol nuevoRol = new Rol();
-            nuevoRol.setNombreRol(req.getNombreRol().trim());
-            nuevoRol.setActivo(activo);
-            nuevoRol.setAccesos(accesosStr);
-
-            Rol saved = rolBL.crearRolCompleto(nuevoRol);
-            return ResponseEntity.status(HttpStatus.CREATED).body(saved);
-
-        } catch (RuntimeException ex) {
-            ex.printStackTrace();
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
-                    new UnsuccessfulResponse("400", ex.getMessage(), "/usuario/rol")
-            );
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Error inesperado en /usuario/rol: " + e.getMessage());
-        }
-    }
-
-
-
-    @DeleteMapping("/rol/{idRol}")
-    public ResponseEntity<?> eliminarRol(@PathVariable Long idRol) {
-        try {
-            rolBL.eliminarRol(idRol);
-            return ResponseEntity.ok("Rol eliminado");
-        } catch (RuntimeException ex) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
-                    new UnsuccessfulResponse("400", ex.getMessage(), "/usuario/rol/{idRol}")
-            );
-        }
-    }
-
-    public static class AssignRoleRequest {
-        private Long roleId;
-        private String roleName;
-        public Long getRoleId() { return roleId; }
-        public void setRoleId(Long roleId) { this.roleId = roleId; }
-        public String getRoleName() { return roleName; }
-        public void setRoleName(String roleName) { this.roleName = roleName; }
-    }
-
-    @PostMapping("/{id_usuario}/rol")
-    public ResponseEntity<?> assignRole(
-            @PathVariable("id_usuario") Long idUsuario,
-            @RequestBody AssignRoleRequest req) {
-        try {
-            Usuario updated = usuarioService.assignRole(idUsuario, req.getRoleId(), req.getRoleName());
-            updated.setContraseniaEntity(null);
-            return ResponseEntity.ok(updated);
-        } catch (RuntimeException ex) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(new UnsuccessfulResponse("400", ex.getMessage(), "/usuario/{id}/rol"));
-        }
-    }
-
-    @DeleteMapping("/{id_usuario}/rol")
-    public ResponseEntity<?> removeRole(@PathVariable("id_usuario") Long idUsuario) {
-        try {
-            Usuario updated = usuarioService.removeRole(idUsuario);
-            updated.setContraseniaEntity(null);
-            return ResponseEntity.ok(updated);
-        } catch (RuntimeException ex) {
-            return ResponseEntity
-                    .status(HttpStatus.BAD_REQUEST)
-                    .body(new UnsuccessfulResponse(
-                            "400",
-                            "Error al quitar rol: " + ex.getMessage(),
-                            "/usuario/" + idUsuario + "/rol"
-                    ));
-        }
-    }
-
     @GetMapping("/rol")
     public ResponseEntity<?> listarRoles() {
         try {

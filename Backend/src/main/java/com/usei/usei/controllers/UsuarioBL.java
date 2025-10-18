@@ -46,10 +46,13 @@ public class UsuarioBL implements UsuarioService {
     @Override
     @Transactional
     public Usuario save(Usuario usuario) {
-        if (usuarioDAO.existsByCi(usuario.getCi()))
+        // 🔹 Verificar duplicado solo si el CI pertenece a OTRO usuario
+        Optional<Usuario> existente = usuarioDAO.findByCi(usuario.getCi());
+        if (existente.isPresent() && !existente.get().getIdUsuario().equals(usuario.getIdUsuario())) {
             throw new RuntimeException("Ya existe un usuario con el CI " + usuario.getCi());
+        }
 
-        // Validar y crear contraseña por defecto
+        // 🔹 Si no tiene contraseña asociada, generar una por defecto
         if (usuario.getContraseniaEntity() == null) {
             String pass = (usuario.getNombre().substring(0, 1)
                     + usuario.getApellido().substring(0, 1)

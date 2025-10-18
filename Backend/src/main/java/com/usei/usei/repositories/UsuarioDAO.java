@@ -8,6 +8,8 @@ public interface UsuarioDAO extends CrudRepository<Usuario, Long> {
 
     Usuario findByCorreo(String correo);
 
+    Optional<Usuario> findByCi(String ci);
+
     boolean existsByCi(String ci);
 
     long countByRolEntity_IdRol(Long idRol);
