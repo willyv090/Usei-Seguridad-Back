@@ -4,10 +4,12 @@ import java.io.Serializable;
 import java.util.Collection;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 
 @Entity
 @Table(name = "usuario")
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 @NamedQueries({
         @NamedQuery(name = "Usuario.findAll", query = "SELECT u FROM Usuario u"),
         @NamedQuery(name = "Usuario.findByIdUsuario", query = "SELECT u FROM Usuario u WHERE u.idUsuario = :idUsuario"),

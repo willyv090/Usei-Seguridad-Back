@@ -1,9 +1,11 @@
 package com.usei.usei.models;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 
 @Entity
 @Table(name = "roles")
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Rol {
 
     @Id

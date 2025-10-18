@@ -1,8 +1,6 @@
 package com.usei.usei.api;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 import com.usei.usei.models.Contrasenia;
 import com.usei.usei.repositories.ContraseniaDAO;
@@ -114,10 +112,19 @@ public class UsuarioAPI {
     // ===========================
     @GetMapping
     public ResponseEntity<?> readAll() {
-        Iterable<Usuario> all = usuarioService.findAll();
-        all.forEach(u -> u.setContraseniaEntity(null));
-        return ResponseEntity.ok(all);
+        try {
+            List<Usuario> usuarios = new ArrayList<>();
+            usuarioService.findAll().forEach(u -> {
+                u.setContraseniaEntity(null); // ocultar contraseñas
+                usuarios.add(u);
+            });
+            return ResponseEntity.ok(usuarios); // ✅ devolver lista JSON
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error al listar usuarios: " + e.getMessage());
+        }
     }
+
 
     // ===========================
     // ELIMINAR USUARIO
