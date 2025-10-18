@@ -23,7 +23,6 @@ import com.usei.usei.util.TokenGenerator;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 
-
 import jakarta.mail.MessagingException;
 
 @RestController
@@ -36,22 +35,20 @@ public class UsuarioAPI {
     @Autowired
     private TokenGenerator tokenGenerator;
 
-    // Service de roles para crear/eliminar roles
     @Autowired
     private RolBL rolBL;
 
     @Autowired
     private ContraseniaDAO contraseniaDAO;
 
-
-    // ====== CRUD ======
-
+    // ===========================
+    // CREAR USUARIO
+    // ===========================
     @PostMapping
     public ResponseEntity<?> create(@RequestBody Map<String, Object> body) {
         try {
-            // Validaciones básicas
-            if (!body.containsKey("nombre") || !body.containsKey("apellido") ||
-                    !body.containsKey("ci") || !body.containsKey("idRol")) {
+            if (!body.containsKey("nombre") || !body.containsKey("apellido")
+                    || !body.containsKey("ci") || !body.containsKey("idRol")) {
                 return ResponseEntity.badRequest()
                         .body("Faltan campos obligatorios: nombre, apellido, ci, idRol");
             }
@@ -68,16 +65,14 @@ public class UsuarioAPI {
             if (rol == null)
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("El rol especificado no existe.");
 
-            // 1️⃣ Generar contraseña por defecto (ej: CN123456)
+            // 1️⃣ Generar contraseña por defecto
             String contraseniaGenerada = (nombre.substring(0, 1) + apellido.substring(0, 1) + ci).toUpperCase();
 
-            // 2️⃣ Crear entidad de contraseña
+            // 2️⃣ Crear entidad Contrasenia
             Contrasenia nuevaPass = new Contrasenia(contraseniaGenerada, contraseniaGenerada.length(), 1);
-
-            // Guardar en BD (usa el nuevo DAO)
             Contrasenia savedPass = contraseniaDAO.save(nuevaPass);
 
-            // 3️⃣ Crear usuario y asignarle la FK
+            // 3️⃣ Crear usuario con FK a Contrasenia
             Usuario nuevoUsuario = new Usuario();
             nuevoUsuario.setNombre(nombre);
             nuevoUsuario.setApellido(apellido);
@@ -91,6 +86,7 @@ public class UsuarioAPI {
             nuevoUsuario.setCambioContrasenia(true);
 
             Usuario saved = usuarioService.save(nuevoUsuario);
+            saved.setContraseniaEntity(null); // ocultar contraseña en respuesta
             return ResponseEntity.status(HttpStatus.CREATED).body(saved);
 
         } catch (Exception e) {
@@ -100,86 +96,113 @@ public class UsuarioAPI {
         }
     }
 
-
+    // ===========================
+    // OBTENER USUARIO POR ID
+    // ===========================
     @GetMapping("/{id_usuario}")
     public ResponseEntity<?> read(@PathVariable("id_usuario") Long idUsuario) {
         Optional<Usuario> oUsuario = usuarioService.findById(idUsuario);
         if (oUsuario.isEmpty()) return ResponseEntity.notFound().build();
-        oUsuario.get().setContrasenia(null);
-        return ResponseEntity.ok(oUsuario.get());
+
+        Usuario usuario = oUsuario.get();
+        usuario.setContraseniaEntity(null);
+        return ResponseEntity.ok(usuario);
     }
 
+    // ===========================
+    // LISTAR TODOS LOS USUARIOS
+    // ===========================
     @GetMapping
     public ResponseEntity<?> readAll() {
         Iterable<Usuario> all = usuarioService.findAll();
-        // enmascarar contraseñas por seguridad
-        all.forEach(u -> u.setContrasenia(null));
+        all.forEach(u -> u.setContraseniaEntity(null));
         return ResponseEntity.ok(all);
     }
 
+    // ===========================
+    // ELIMINAR USUARIO
+    // ===========================
     @DeleteMapping("/{id_usuario}")
     public ResponseEntity<?> delete(@PathVariable("id_usuario") Long idUsuario) {
         Optional<Usuario> oUsuario = usuarioService.findById(idUsuario);
         if (oUsuario.isEmpty()) return ResponseEntity.notFound().build();
+
         usuarioService.deleteById(idUsuario);
-        oUsuario.get().setContrasenia(null);
-        return ResponseEntity.ok(oUsuario.get());
+        return ResponseEntity.ok("Usuario eliminado correctamente.");
     }
 
+    // ===========================
+    // ACTUALIZAR USUARIO
+    // ===========================
     @PutMapping("/{id_usuario}")
     public ResponseEntity<?> update(@PathVariable("id_usuario") Long idUsuario, @RequestBody Usuario usuario) {
         Optional<Usuario> oUsuario = usuarioService.findById(idUsuario);
         if (oUsuario.isEmpty()) return ResponseEntity.notFound().build();
 
-        oUsuario.get().setNombre(usuario.getNombre());
-        oUsuario.get().setApellido(usuario.getApellido());
-        oUsuario.get().setTelefono(usuario.getTelefono());
-        oUsuario.get().setCorreo(usuario.getCorreo());
-        oUsuario.get().setCarrera(usuario.getCarrera());
-        oUsuario.get().setRol(usuario.getRol());
-        oUsuario.get().setCi(usuario.getCi());
+        Usuario u = oUsuario.get();
+        u.setNombre(usuario.getNombre());
+        u.setApellido(usuario.getApellido());
+        u.setTelefono(usuario.getTelefono());
+        u.setCorreo(usuario.getCorreo());
+        u.setCarrera(usuario.getCarrera());
+        u.setRol(usuario.getRol());
+        u.setCi(usuario.getCi());
 
-        Usuario updated = usuarioService.save(oUsuario.get());
-        updated.setContrasenia(null);
+        Usuario updated = usuarioService.save(u);
+        updated.setContraseniaEntity(null);
         return ResponseEntity.status(HttpStatus.CREATED).body(updated);
     }
 
-    // ====== PASSWORD ======
-
+    // ===========================
+    // CAMBIAR CONTRASEÑA
+    // ===========================
     @PutMapping("/change-password")
     public ResponseEntity<?> changePassword(@RequestParam Long idUsuario, @RequestBody HashMap<String, String> passwordData) {
         Optional<Usuario> oUsuario = usuarioService.findById(idUsuario);
         if (oUsuario.isEmpty()) return ResponseEntity.notFound().build();
 
-        oUsuario.get().setContrasenia(passwordData.get("newPassword"));
-        usuarioService.save(oUsuario.get());
-        return ResponseEntity.ok("Contraseña actualizada exitosamente.");
+        Usuario usuario = oUsuario.get();
+        String nuevaPassStr = passwordData.get("newPassword");
+
+        if (nuevaPassStr == null || nuevaPassStr.isBlank())
+            return ResponseEntity.badRequest().body("La nueva contraseña no puede estar vacía.");
+
+        Contrasenia nuevaPass = new Contrasenia(nuevaPassStr, nuevaPassStr.length(), 1);
+        Contrasenia savedPass = contraseniaDAO.save(nuevaPass);
+
+        usuario.setContraseniaEntity(savedPass);
+        usuario.setCambioContrasenia(false);
+        usuarioService.save(usuario);
+
+        return ResponseEntity.ok("Contraseña actualizada correctamente.");
     }
 
-    // ====== LOGIN ======
-
+    // ===========================
+    // LOGIN
+    // ===========================
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequestUserDTO loginRequestUser) {
-        try{
+        try {
             Optional<Usuario> usuario = usuarioService.login(loginRequestUser.getCorreo(), loginRequestUser.getContrasena());
             if (usuario.isPresent()) {
                 Usuario user = usuario.get();
-                user.setContrasenia(null); // No enviar contraseña
+                user.setContraseniaEntity(null);
 
                 String token = tokenGenerator.generateToken(
                         String.valueOf(user.getIdUsuario()),
-                        user.getRol(), // si usas entidad de rol, aquí podrías usar user.getRolEntity().getNombreRol()
+                        user.getRol(),
                         user.getCorreo(),
                         60
                 );
 
                 Map<String, Object> data = new HashMap<>();
                 data.put("id_usuario", user.getIdUsuario());
-                data.put("rol", user.getRol()); // o user.getRolEntity().getNombreRol()
+                data.put("rol", user.getRol());
                 data.put("correo", user.getCorreo());
                 data.put("carrera", user.getCarrera());
                 data.put("nombre", user.getNombre());
                 data.put("ci", user.getCi());
+                data.put("cambio_contrasenia", user.getCambioContrasenia());
 
                 SuccessfulResponse response = new SuccessfulResponse(
                         "200 OK",
@@ -202,8 +225,9 @@ public class UsuarioAPI {
         }
     }
 
-    // ====== EMAIL CÓDIGO ======
-
+    // ===========================
+    // EMAIL: ENVIAR CÓDIGO
+    // ===========================
     @PostMapping("/enviarCodigoVerificacion/{correo}")
     public ResponseEntity<?> enviarCodigoVerificacion(@PathVariable("correo") String correo) {
         try {
@@ -227,13 +251,13 @@ public class UsuarioAPI {
         }
     }
 
-    // ====== ROLES ======
-
-    // ---------- Crear Rol ----------
+    // ===========================
+    // ROLES
+    // ===========================
     public static class CrearRolRequest {
         private String nombreRol;
-        private Object activo; // puede venir true/false o "SI"/"NO"
-        private java.util.List<String> accesos; // lista de módulos seleccionados
+        private Object activo;
+        private java.util.List<String> accesos;
 
         public String getNombreRol() { return nombreRol; }
         public void setNombreRol(String nombreRol) { this.nombreRol = nombreRol; }
@@ -242,7 +266,7 @@ public class UsuarioAPI {
         public java.util.List<String> getAccesos() { return accesos; }
         public void setAccesos(java.util.List<String> accesos) { this.accesos = accesos; }
     }
-    // normalizador rápido para campo "activo"
+
     private Boolean normalizeActivo(Object v) {
         if (v == null) return Boolean.TRUE;
         if (v instanceof Boolean) return (Boolean) v;
@@ -252,36 +276,46 @@ public class UsuarioAPI {
         return Boolean.TRUE;
     }
 
-
     @PostMapping("/rol")
-    public ResponseEntity<?> crearRol(@RequestBody CrearRolRequest req) {
+    public ResponseEntity<?> crearRol(@RequestBody(required = false) CrearRolRequest req) {
         try {
+            if (req == null) {
+                return ResponseEntity.badRequest().body("El cuerpo de la solicitud está vacío o malformado.");
+            }
+
             if (req.getNombreRol() == null || req.getNombreRol().isBlank()) {
                 return ResponseEntity.badRequest().body("El nombre del rol es obligatorio.");
             }
 
             Boolean activo = normalizeActivo(req.getActivo());
-            String[] accesosArray = (req.getAccesos() != null)
-                    ? req.getAccesos().toArray(new String[0])
-                    : new String[0];
+
+            // 🔹 Convertir lista de accesos a texto
+            String accesosStr = "";
+            if (req.getAccesos() != null && !req.getAccesos().isEmpty()) {
+                accesosStr = String.join(",", req.getAccesos());
+            }
 
             Rol nuevoRol = new Rol();
             nuevoRol.setNombreRol(req.getNombreRol().trim());
             nuevoRol.setActivo(activo);
-            nuevoRol.setAccesos(accesosArray);
+            nuevoRol.setAccesos(accesosStr);
 
             Rol saved = rolBL.crearRolCompleto(nuevoRol);
             return ResponseEntity.status(HttpStatus.CREATED).body(saved);
 
         } catch (RuntimeException ex) {
+            ex.printStackTrace();
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
                     new UnsuccessfulResponse("400", ex.getMessage(), "/usuario/rol")
             );
         } catch (Exception e) {
+            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Error inesperado: " + e.getMessage());
+                    .body("Error inesperado en /usuario/rol: " + e.getMessage());
         }
     }
+
+
 
     @DeleteMapping("/rol/{idRol}")
     public ResponseEntity<?> eliminarRol(@PathVariable Long idRol) {
@@ -295,7 +329,6 @@ public class UsuarioAPI {
         }
     }
 
-    // ---------- Asignar Rol existente a un Usuario ----------
     public static class AssignRoleRequest {
         private Long roleId;
         private String roleName;
@@ -311,7 +344,7 @@ public class UsuarioAPI {
             @RequestBody AssignRoleRequest req) {
         try {
             Usuario updated = usuarioService.assignRole(idUsuario, req.getRoleId(), req.getRoleName());
-            updated.setContrasenia(null);
+            updated.setContraseniaEntity(null);
             return ResponseEntity.ok(updated);
         } catch (RuntimeException ex) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
@@ -323,11 +356,9 @@ public class UsuarioAPI {
     public ResponseEntity<?> removeRole(@PathVariable("id_usuario") Long idUsuario) {
         try {
             Usuario updated = usuarioService.removeRole(idUsuario);
-            // no exponer contraseñas
-            updated.setContrasenia(null);
+            updated.setContraseniaEntity(null);
             return ResponseEntity.ok(updated);
         } catch (RuntimeException ex) {
-            // Usa el constructor real de tu UnsuccessfulResponse (sin parámetros con nombre)
             return ResponseEntity
                     .status(HttpStatus.BAD_REQUEST)
                     .body(new UnsuccessfulResponse(
@@ -338,7 +369,6 @@ public class UsuarioAPI {
         }
     }
 
-    // ---------- Listar Roles ----------
     @GetMapping("/rol")
     public ResponseEntity<?> listarRoles() {
         try {
@@ -351,7 +381,6 @@ public class UsuarioAPI {
         }
     }
 
-    // ---------- Actualizar estado (activar/desactivar rol) ----------
     @PutMapping("/rol/{idRol}/estado")
     public ResponseEntity<?> actualizarEstadoRol(@PathVariable Long idRol, @RequestBody Map<String, Object> body) {
         try {
@@ -371,7 +400,4 @@ public class UsuarioAPI {
                     .body("Error inesperado: " + e.getMessage());
         }
     }
-
-
-
 }

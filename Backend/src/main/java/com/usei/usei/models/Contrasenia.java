@@ -1,35 +1,34 @@
 package com.usei.usei.models;
 
 import jakarta.persistence.*;
-import java.io.Serializable;
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 
 @Entity
 @Table(name = "contrasenia")
-public class Contrasenia implements Serializable {
+public class Contrasenia {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id_pass")
     private Long idPass;
 
-    @Column(name = "contrasenia", nullable = false)
+    @Column(nullable = false, length = 30)
     private String contrasenia;
 
     @Column(name = "fecha_creacion", nullable = false)
-    private LocalDateTime fechaCreacion = LocalDateTime.now();
+    private LocalDate fechaCreacion = LocalDate.now();
 
-    @Column(name = "longitud", nullable = false)
+    @Column(nullable = false)
     private int longitud;
 
-    @Column(name = "complejidad")
-    private int complejidad = 1;
+    @Column(nullable = false)
+    private int complejidad;
 
-    @Column(name = "intentos_restantes")
+    @Column(name = "intentos_restantes", nullable = false)
     private int intentosRestantes = 3;
 
-    @Column(name = "ultimo_log")
-    private LocalDateTime ultimoLog;
+    @Column(name = "ultimo_log", nullable = false)
+    private LocalDate ultimoLog = LocalDate.now();
 
     public Contrasenia() {}
 
@@ -37,18 +36,20 @@ public class Contrasenia implements Serializable {
         this.contrasenia = contrasenia;
         this.longitud = longitud;
         this.complejidad = complejidad;
+        this.fechaCreacion = LocalDate.now();
         this.intentosRestantes = 3;
+        this.ultimoLog = LocalDate.now();
     }
 
-    // Getters y setters
+    // --- Getters y Setters correctos ---
     public Long getIdPass() { return idPass; }
     public void setIdPass(Long idPass) { this.idPass = idPass; }
 
     public String getContrasenia() { return contrasenia; }
     public void setContrasenia(String contrasenia) { this.contrasenia = contrasenia; }
 
-    public LocalDateTime getFechaCreacion() { return fechaCreacion; }
-    public void setFechaCreacion(LocalDateTime fechaCreacion) { this.fechaCreacion = fechaCreacion; }
+    public LocalDate getFechaCreacion() { return fechaCreacion; }
+    public void setFechaCreacion(LocalDate fechaCreacion) { this.fechaCreacion = fechaCreacion; }
 
     public int getLongitud() { return longitud; }
     public void setLongitud(int longitud) { this.longitud = longitud; }
@@ -59,6 +60,6 @@ public class Contrasenia implements Serializable {
     public int getIntentosRestantes() { return intentosRestantes; }
     public void setIntentosRestantes(int intentosRestantes) { this.intentosRestantes = intentosRestantes; }
 
-    public LocalDateTime getUltimoLog() { return ultimoLog; }
-    public void setUltimoLog(LocalDateTime ultimoLog) { this.ultimoLog = ultimoLog; }
+    public LocalDate getUltimoLog() { return ultimoLog; }
+    public void setUltimoLog(LocalDate ultimoLog) { this.ultimoLog = ultimoLog; }
 }

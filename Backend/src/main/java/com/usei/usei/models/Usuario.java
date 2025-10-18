@@ -4,7 +4,6 @@ import java.io.Serializable;
 import java.util.Collection;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-
 import jakarta.persistence.*;
 
 @Entity
@@ -17,15 +16,13 @@ import jakarta.persistence.*;
         @NamedQuery(name = "Usuario.findByCorreo", query = "SELECT u FROM Usuario u WHERE u.correo = :correo"),
         @NamedQuery(name = "Usuario.findByCarrera", query = "SELECT u FROM Usuario u WHERE u.carrera = :carrera"),
         @NamedQuery(name = "Usuario.findByRol", query = "SELECT u FROM Usuario u WHERE u.rol = :rol"),
-        @NamedQuery(name = "Usuario.findByCi", query = "SELECT u FROM Usuario u WHERE u.ci = :ci"),
-        @NamedQuery(name = "Usuario.findByContrasenia", query = "SELECT u FROM Usuario u WHERE u.contrasenia = :contrasenia")
+        @NamedQuery(name = "Usuario.findByCi", query = "SELECT u FROM Usuario u WHERE u.ci = :ci")
 })
 public class Usuario implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
     // ====== Campos principales ======
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id_usuario")
@@ -57,20 +54,21 @@ public class Usuario implements Serializable {
 
     @Basic(optional = false)
     @Column(name = "ci", unique = true)
-    private String ci; // reemplaza a 'usuario'
-
-    @Column(name = "contrasenia")
-    private String contrasenia;
+    private String ci;
 
     @Column(name = "cambio_contrasenia")
     private Boolean cambioContrasenia = true;
 
     // ====== Relaciones ======
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "Roles_id_rol", nullable = false)
     private Rol rolEntity;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "Contrasenia_id_pass", referencedColumnName = "id_pass", nullable = false)
+    private Contrasenia contraseniaEntity;
+
+    // ====== Colecciones (otras tablas relacionadas) ======
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "usuario")
     @JsonIgnore
     private Collection<Soporte> soporteCollection;
@@ -95,17 +93,11 @@ public class Usuario implements Serializable {
     @JsonIgnore
     private Collection<Plazo> plazoCollection;
 
-    // Nueva relación hacia la tabla Contrasenia
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "Contrasenia_id_pass", referencedColumnName = "id_pass")
-    private Contrasenia contraseniaEntity;
-
-
     // ====== Constructores ======
     public Usuario() {}
 
     public Usuario(Long idUsuario, String nombre, String apellido, int telefono,
-                   String correo, String carrera, String rol, String ci, String contrasenia) {
+                   String correo, String carrera, String rol, String ci) {
         this.idUsuario = idUsuario;
         this.nombre = nombre;
         this.apellido = apellido;
@@ -114,7 +106,6 @@ public class Usuario implements Serializable {
         this.carrera = carrera;
         this.rol = rol;
         this.ci = ci;
-        this.contrasenia = contrasenia;
     }
 
     // ====== Getters y Setters ======
@@ -142,39 +133,19 @@ public class Usuario implements Serializable {
     public String getCi() { return ci; }
     public void setCi(String ci) { this.ci = ci; }
 
-    public String getContrasenia() { return contrasenia; }
-    public void setContrasenia(String contrasenia) { this.contrasenia = contrasenia; }
-
     public Boolean getCambioContrasenia() { return cambioContrasenia; }
     public void setCambioContrasenia(Boolean cambioContrasenia) { this.cambioContrasenia = cambioContrasenia; }
 
     public Rol getRolEntity() { return rolEntity; }
     public void setRolEntity(Rol rolEntity) { this.rolEntity = rolEntity; }
 
-    public Collection<Soporte> getSoporteCollection() { return soporteCollection; }
-    public void setSoporteCollection(Collection<Soporte> soporteCollection) { this.soporteCollection = soporteCollection; }
-
-    public Collection<Encuesta> getEncuestaCollection() { return encuestaCollection; }
-    public void setEncuestaCollection(Collection<Encuesta> encuestaCollection) { this.encuestaCollection = encuestaCollection; }
-
-    public Collection<Certificado> getCertificadoCollection() { return certificadoCollection; }
-    public void setCertificadoCollection(Collection<Certificado> certificadoCollection) { this.certificadoCollection = certificadoCollection; }
-
-    public Collection<Reporte> getReporteCollection() { return reporteCollection; }
-    public void setReporteCollection(Collection<Reporte> reporteCollection) { this.reporteCollection = reporteCollection; }
-
-    public Collection<Noticias> getNoticiasCollection() { return noticiasCollection; }
-    public void setNoticiasCollection(Collection<Noticias> noticiasCollection) { this.noticiasCollection = noticiasCollection; }
-
-    public Collection<Plazo> getPlazoCollection() { return plazoCollection; }
-    public void setPlazoCollection(Collection<Plazo> plazoCollection) { this.plazoCollection = plazoCollection; }
+    public Contrasenia getContraseniaEntity() { return contraseniaEntity; }
+    public void setContraseniaEntity(Contrasenia contraseniaEntity) { this.contraseniaEntity = contraseniaEntity; }
 
     // ====== Métodos utilitarios ======
     @Override
     public int hashCode() {
-        int hash = 0;
-        hash += (idUsuario != null ? idUsuario.hashCode() : 0);
-        return hash;
+        return (idUsuario != null ? idUsuario.hashCode() : 0);
     }
 
     @Override
@@ -189,13 +160,4 @@ public class Usuario implements Serializable {
     public String toString() {
         return "com.usei.usei.Usuario[ idUsuario=" + idUsuario + " ]";
     }
-
-    public Contrasenia getContraseniaEntity() {
-        return contraseniaEntity;
-    }
-
-    public void setContraseniaEntity(Contrasenia contraseniaEntity) {
-        this.contraseniaEntity = contraseniaEntity;
-    }
-
 }

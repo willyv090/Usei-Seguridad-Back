@@ -274,7 +274,7 @@ CREATE TABLE Roles (
     id_rol serial  NOT NULL,
     nombre_rol varchar(50)  NOT NULL,
     activo boolean  NOT NULL,
-    accesos int  NOT NULL,
+    accesos varchar(255)  NOT NULL,
     CONSTRAINT Roles_pk PRIMARY KEY (id_rol)
 );
 

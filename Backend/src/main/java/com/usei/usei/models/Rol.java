@@ -1,8 +1,6 @@
 package com.usei.usei.models;
 
 import jakarta.persistence.*;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "roles")
@@ -16,14 +14,12 @@ public class Rol {
     @Column(name = "nombre_rol", nullable = false, length = 50)
     private String nombreRol;
 
-    // Nuevo campo: activo (por defecto TRUE)
     @Column(name = "activo", nullable = false)
     private Boolean activo = Boolean.TRUE;
 
-    // Nuevo campo: lista de accesos (para PostgreSQL)
-    @JdbcTypeCode(SqlTypes.ARRAY)
-    @Column(name = "accesos", columnDefinition = "varchar(100)[]")
-    private String[] accesos;
+    // ✅ accesos ahora es texto simple (VARCHAR en la BD)
+    @Column(name = "accesos", length = 255)
+    private String accesos;
 
     public Rol() {}
 
@@ -31,7 +27,7 @@ public class Rol {
         this.nombreRol = nombreRol;
     }
 
-    // --- getters y setters ---
+    // --- Getters y Setters ---
     public Long getIdRol() { return idRol; }
     public void setIdRol(Long idRol) { this.idRol = idRol; }
 
@@ -41,6 +37,6 @@ public class Rol {
     public Boolean getActivo() { return activo; }
     public void setActivo(Boolean activo) { this.activo = activo; }
 
-    public String[] getAccesos() { return accesos; }
-    public void setAccesos(String[] accesos) { this.accesos = accesos; }
+    public String getAccesos() { return accesos; }
+    public void setAccesos(String accesos) { this.accesos = accesos; }
 }
