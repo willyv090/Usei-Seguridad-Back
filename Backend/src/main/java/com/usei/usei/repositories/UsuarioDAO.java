@@ -6,7 +6,8 @@ import com.usei.usei.models.Usuario;
 
 public interface UsuarioDAO extends CrudRepository<Usuario, Long> {
 
-    Usuario findByCorreo(String correo);
+    Optional<Usuario> findByCorreo(String correo); 
+
 
     Optional<Usuario> findByCi(String ci);
 

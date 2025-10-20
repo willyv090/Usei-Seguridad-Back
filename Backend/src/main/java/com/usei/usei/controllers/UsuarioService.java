@@ -35,4 +35,6 @@ public interface UsuarioService {
 
     // ==== NUEVO: verificar duplicado de CI ====
     boolean existsByCi(String ci);
+
+    Optional<Usuario> findByCorreo(String correo);
 }

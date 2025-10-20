@@ -10,7 +10,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import com.usei.usei.controllers.PasswordChangeStatus;
 import com.usei.usei.controllers.RolBL;
+import com.usei.usei.controllers.SecurityBL;
 import com.usei.usei.controllers.UsuarioService;
 import com.usei.usei.dto.SuccessfulResponse;
 import com.usei.usei.dto.UnsuccessfulResponse;
@@ -19,8 +21,6 @@ import com.usei.usei.models.LoginResponse;
 import com.usei.usei.models.Rol;
 import com.usei.usei.models.Usuario;
 import com.usei.usei.util.TokenGenerator;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 
 import jakarta.mail.MessagingException;
 
@@ -40,10 +40,14 @@ public class UsuarioAPI {
     @Autowired
     private ContraseniaDAO contraseniaDAO;
 
+    @Autowired
+    private SecurityBL securityBL;
+
+
     // ===========================
     // CREAR USUARIO
     // ===========================
-    @PostMapping
+   @PostMapping
     public ResponseEntity<?> create(@RequestBody Map<String, Object> body) {
         try {
             if (!body.containsKey("nombre") || !body.containsKey("apellido")
@@ -64,14 +68,7 @@ public class UsuarioAPI {
             if (rol == null)
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("El rol especificado no existe.");
 
-            // 1️⃣ Generar contraseña por defecto
-            String contraseniaGenerada = (nombre.substring(0, 1) + apellido.substring(0, 1) + ci).toUpperCase();
-
-            // 2️⃣ Crear entidad Contrasenia
-            Contrasenia nuevaPass = new Contrasenia(contraseniaGenerada, contraseniaGenerada.length(), 1);
-            Contrasenia savedPass = contraseniaDAO.save(nuevaPass);
-
-            // 3️⃣ Crear usuario con FK a Contrasenia
+            // ⚠️ NO crear Contrasenia aquí. Deja que UsuarioBL.save() lo haga y lo hashee.
             Usuario nuevoUsuario = new Usuario();
             nuevoUsuario.setNombre(nombre);
             nuevoUsuario.setApellido(apellido);
@@ -81,11 +78,11 @@ public class UsuarioAPI {
             nuevoUsuario.setCarrera(carrera);
             nuevoUsuario.setRol(rol.getNombreRol());
             nuevoUsuario.setRolEntity(rol);
-            nuevoUsuario.setContraseniaEntity(savedPass);
-            nuevoUsuario.setCambioContrasenia(true);
 
+            // UsuarioBL.save() detecta contraseniaEntity == null, genera contraseña inicial, la HASHEA,
+            // aplica política, setea cambioContrasenia=true y envía el correo.
             Usuario saved = usuarioService.save(nuevoUsuario);
-            saved.setContraseniaEntity(null); // ocultar contraseña en respuesta
+            saved.setContraseniaEntity(null);
             return ResponseEntity.status(HttpStatus.CREATED).body(saved);
 
         } catch (Exception e) {
@@ -272,27 +269,39 @@ public class UsuarioAPI {
 
 
     // ===========================
-    // CAMBIAR CONTRASEÑA
+    // CAMBIAR CONTRASEÑA (con hash + políticas + historial)
     // ===========================
     @PutMapping("/change-password")
-    public ResponseEntity<?> changePassword(@RequestParam Long idUsuario, @RequestBody HashMap<String, String> passwordData) {
-        Optional<Usuario> oUsuario = usuarioService.findById(idUsuario);
-        if (oUsuario.isEmpty()) return ResponseEntity.notFound().build();
+    public ResponseEntity<?> changePassword(@RequestParam Long idUsuario,
+                                            @RequestBody HashMap<String, String> body) {
+        try {
+            String nuevaPassStr = body.get("newPassword");
+            if (nuevaPassStr == null || nuevaPassStr.isBlank()) {
+                return ResponseEntity.badRequest().body("La nueva contraseña no puede estar vacía.");
+            }
 
-        Usuario usuario = oUsuario.get();
-        String nuevaPassStr = passwordData.get("newPassword");
+            PasswordChangeStatus status = securityBL.changePassword(idUsuario, nuevaPassStr);
 
-        if (nuevaPassStr == null || nuevaPassStr.isBlank())
-            return ResponseEntity.badRequest().body("La nueva contraseña no puede estar vacía.");
-
-        Contrasenia nuevaPass = new Contrasenia(nuevaPassStr, nuevaPassStr.length(), 1);
-        Contrasenia savedPass = contraseniaDAO.save(nuevaPass);
-
-        usuario.setContraseniaEntity(savedPass);
-        usuario.setCambioContrasenia(false);
-        usuarioService.save(usuario);
-
-        return ResponseEntity.ok("Contraseña actualizada correctamente.");
+            switch (status) {
+                case CAMBIO_OK:
+                    return ResponseEntity.ok("Contraseña actualizada correctamente.");
+                case POLITICA_NO_CUMPLIDA:
+                    return ResponseEntity.badRequest()
+                            .body("La contraseña no cumple la política (mín 12, mayús, minús, número, especial).");
+                case REUTILIZACION_ULTIMA:
+                    return ResponseEntity.badRequest().body("No puedes reutilizar la contraseña actual.");
+                case REUTILIZACION_HISTORIAL:
+                    return ResponseEntity.badRequest().body("No puedes reutilizar una contraseña usada en los últimos 12 meses.");
+                case USUARIO_SIN_CONTRASENIA:
+                    return ResponseEntity.status(HttpStatus.NOT_FOUND).body("El usuario no tiene contraseña asociada.");
+                default:
+                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("No se pudo cambiar la contraseña.");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error al cambiar la contraseña: " + e.getMessage());
+        }
     }
 
     // ===========================
@@ -346,28 +355,47 @@ public class UsuarioAPI {
     // ===========================
     // EMAIL: ENVIAR CÓDIGO
     // ===========================
-    @PostMapping("/enviarCodigoVerificacion/{correo}")
-    public ResponseEntity<?> enviarCodigoVerificacion(@PathVariable("correo") String correo) {
+   // En UsuarioAPI
+    // En com.usei.usei.api.UsuarioAPI
+    @PostMapping("/enviarCodigoVerificacion")
+    public ResponseEntity<?> enviarCodigoVerificacion(@RequestBody Map<String, String> body) {
         try {
-            Long idDirector = usuarioService.findByMail(correo);
-            if (idDirector == 0) {
-                return new ResponseEntity<>("No se encontró un Director con ese correo.", HttpStatus.NOT_FOUND);
+            String correo = (body != null) ? String.valueOf(body.get("correo")).trim() : null;
+            if (correo == null || correo.isBlank()) {
+                return ResponseEntity.badRequest().body("Debe proporcionar un correo.");
+            }
+            if (!correo.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) {
+                return ResponseEntity.badRequest().body("Correo inválido.");
             }
 
+            Long idUsuario = usuarioService.findByMail(correo);
+            if (idUsuario == 0L) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body("No se encontró un usuario con ese correo.");
+            }
+
+            // envía el email y guarda el código asociado al correo
             usuarioService.enviarCodigoVerificacion(correo);
+
+            // DEV ONLY: exponer el código para validarlo en el front
             String codigoVerificacion = usuarioService.obtenerCodigoVerificacion();
 
-            return new ResponseEntity<>(new HashMap<String, Object>() {{
-                put("mensaje", "Código de verificación enviado exitosamente");
-                put("codigoVerificacion", codigoVerificacion);
-                put("idDirector", idDirector);
-            }}, HttpStatus.OK);
-        } catch (MessagingException e) {
-            return new ResponseEntity<>("Error al enviar el código de verificación: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("mensaje", "Código de verificación enviado exitosamente");
+            payload.put("idUsuario", idUsuario);
+            payload.put("codigoVerificacion", codigoVerificacion); // <-- SOLO DEV
+            return ResponseEntity.ok(payload);
+
+        } catch (jakarta.mail.MessagingException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error al enviar el código de verificación: " + e.getMessage());
         } catch (Exception e) {
-            return new ResponseEntity<>("Error inesperado: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error inesperado: " + e.getMessage());
         }
     }
+
+
 
     // ===========================
     // ROLES

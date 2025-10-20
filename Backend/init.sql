@@ -16,7 +16,7 @@ CREATE TABLE Certificado (
 -- Table: Contrasenia
 CREATE TABLE Contrasenia (
     id_pass serial  NOT NULL,
-    contrasenia varchar(30)  NOT NULL,
+    contrasenia varchar(100)  NOT NULL,
     fecha_creacion date  NOT NULL,
     longitud int  NOT NULL,
     complejidad int  NOT NULL,
@@ -81,7 +81,7 @@ CREATE TABLE Estudiante (
     anio int  NOT NULL,
     semestre int  NOT NULL,
     estado_invitacion varchar(50)  NOT NULL,
-    contrasena varchar(50)  NOT NULL,
+    contrasena varchar(100)  NOT NULL,
     CONSTRAINT Estudiante_pk PRIMARY KEY (id_estudiante)
 );
 
@@ -101,7 +101,7 @@ CREATE TABLE H_Certificado (
 -- Table: H_Contrasenia
 CREATE TABLE H_Contrasenia (
     id_pass serial  NOT NULL,
-    contrasenia varchar(30)  NOT NULL,
+    contrasenia varchar(100)  NOT NULL,
     fecha_creacion date  NOT NULL,
     longitud int  NOT NULL,
     complejidad int  NOT NULL,
@@ -180,7 +180,7 @@ CREATE TABLE H_Usuario (
     correo varchar(40)  NOT NULL,
     rol varchar(20)  NOT NULL,
     usuario varchar(30)  NOT NULL,
-    contrasenia varchar(30)  NOT NULL,
+    contrasenia varchar(100)  NOT NULL,
     ver int  NOT NULL,
     tx_date timestamp  NOT NULL,
     tx_user int  NOT NULL,
@@ -485,6 +485,19 @@ ALTER TABLE Usuario ADD CONSTRAINT Usuario_Roles
     NOT DEFERRABLE
     INITIALLY IMMEDIATE
 ;
+
+-- 1) Quitar la PK actual basada solo en id_pass
+ALTER TABLE H_Contrasenia DROP CONSTRAINT IF EXISTS H_Contrasenia_pk;
+
+-- 2) Crear PK compuesta
+ALTER TABLE H_Contrasenia
+  ADD CONSTRAINT H_Contrasenia_pk PRIMARY KEY (id_pass, tx_date);
+
+-- 3) (opcional) Index para consultas por id_pass/TX_DATE
+CREATE INDEX IF NOT EXISTS idx_hc_txdate ON H_Contrasenia (id_pass, tx_date DESC);
+
+
+
 
 -- End of file.
 
