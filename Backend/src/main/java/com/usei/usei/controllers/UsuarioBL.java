@@ -1,18 +1,23 @@
 package com.usei.usei.controllers;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.Optional;
 import java.security.SecureRandom;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.usei.usei.models.*;
-import com.usei.usei.repositories.*;
+import com.usei.usei.models.Contrasenia;
+import com.usei.usei.models.Rol;
+import com.usei.usei.models.Usuario;
+import com.usei.usei.repositories.ContraseniaDAO;
+import com.usei.usei.repositories.RolDAO;
+import com.usei.usei.repositories.UsuarioDAO;
+import com.usei.usei.util.PasswordPolicyUtil;
 
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
@@ -24,12 +29,16 @@ public class UsuarioBL implements UsuarioService {
     @Autowired private RolDAO rolDAO;
     @Autowired private ContraseniaDAO contraseniaDAO;
     private final JavaMailSender mailSender;
+    private final PasswordEncoder passwordEncoder; // BCrypt
     private String codigoVerificacion;
 
     @Autowired
-    public UsuarioBL(UsuarioDAO usuarioDAO, JavaMailSender mailSender) {
+    public UsuarioBL(UsuarioDAO usuarioDAO,
+                     JavaMailSender mailSender,
+                     PasswordEncoder passwordEncoder) {
         this.usuarioDAO = usuarioDAO;
         this.mailSender = mailSender;
+        this.passwordEncoder = passwordEncoder;
     }
 
     /* ==========================
@@ -46,45 +55,43 @@ public class UsuarioBL implements UsuarioService {
     @Override
     @Transactional
     public Usuario save(Usuario usuario) {
-        // 🔹 Evitar duplicados de CI en otros usuarios
+        // Evitar duplicados de CI en otros usuarios
         Optional<Usuario> existente = usuarioDAO.findByCi(usuario.getCi());
         if (existente.isPresent() && !existente.get().getIdUsuario().equals(usuario.getIdUsuario())) {
             throw new RuntimeException("Ya existe un usuario con el CI " + usuario.getCi());
         }
 
-        // 🔹 Generar contraseña por defecto si no tiene
+        // Generar contraseña por defecto si no tiene aún
         if (usuario.getContraseniaEntity() == null) {
-            String nombre = usuario.getNombre().trim();
-            String apellido = usuario.getApellido().trim();
-            String ci = usuario.getCi().trim();
+            final String contraseniaGenerada = buildInitialPassword(
+                    nullSafe(usuario.getNombre()), nullSafe(usuario.getApellido()), nullSafe(usuario.getCi())
+            );
 
-            // Ejemplo: Rosario Calisaya 9172358 → Rc9172358
-            String inicialNombre = nombre.substring(0, 1).toUpperCase();
-            String apellidoMin = apellido.toLowerCase().replaceAll("\\s+", "");
-            String contraseniaGenerada = inicialNombre + apellidoMin + ci;
+            // Hash (nunca guardes texto plano)
+            String hash = passwordEncoder.encode(contraseniaGenerada);
 
-            // Crear entidad de contraseña
+            // Crear entidad Contrasenia con política
             Contrasenia contrasenia = new Contrasenia();
-            contrasenia.setContrasenia(contraseniaGenerada);
+            contrasenia.setContrasenia(hash);
             contrasenia.setFechaCreacion(LocalDate.now());
-            contrasenia.setLongitud(contraseniaGenerada.length());
-            contrasenia.setComplejidad(1);
-            contrasenia.setIntentosRestantes(3);
             contrasenia.setUltimoLog(LocalDate.now());
+            contrasenia.setLongitud(Math.max(PasswordPolicyUtil.MIN_LENGTH, contraseniaGenerada.length()));
+            contrasenia.setComplejidad(PasswordPolicyUtil.COMPLEJIDAD); // 4: mayus/minus/num/especial
+            contrasenia.setIntentosRestantes(PasswordPolicyUtil.MAX_INTENTOS);
 
             contrasenia = contraseniaDAO.save(contrasenia);
             usuario.setContraseniaEntity(contrasenia);
 
-            // Marcar que debe cambiarla al ingresar
+            // Forzar cambio de contraseña al primer login
             usuario.setCambioContrasenia(true);
 
-            // 🔹 Enviar correo de notificación (solo si tiene correo)
+            // Enviar correo de notificación (si hay correo)
             if (usuario.getCorreo() != null && !usuario.getCorreo().isBlank()) {
                 try {
                     String cuerpo = """
                     Estimado/a %s %s,
                     
-                    Su cuenta ha sido creada exitosamente para el Sistema de Encuesta a Tiempo de Graduación USEI.
+                    Su cuenta ha sido creada exitosamente para el Sistema USEI.
                     
                     Sus credenciales iniciales son:
                     Usuario: %s
@@ -98,19 +105,16 @@ public class UsuarioBL implements UsuarioService {
                     """.formatted(
                             usuario.getNombre(),
                             usuario.getApellido(),
-                            ci,
+                            usuario.getCi(),
                             contraseniaGenerada
                     );
-
-                    enviarCorreo(usuario.getCorreo(), "Credenciales de acceso - Encuesta a tiempo de graduación USEI", cuerpo);
-                    System.out.println("Correo enviado correctamente a " + usuario.getCorreo());
+                    enviarCorreo(usuario.getCorreo(), "Credenciales de acceso - Sistema USEI", cuerpo);
                 } catch (Exception e) {
                     System.err.println("Error al enviar correo a " + usuario.getCorreo() + ": " + e.getMessage());
                 }
             }
         }
 
-        // 🔹 Guardar usuario
         return usuarioDAO.save(usuario);
     }
 
@@ -140,19 +144,29 @@ public class UsuarioBL implements UsuarioService {
     }
 
     /* ==========================
-       LOGIN
+       LOGIN (plano; recomendado usar SecurityBL.login() en API)
        ========================== */
     @Override
     @Transactional(readOnly = true)
     public Optional<Usuario> login(String correo, String contraseniaIngresada) {
-        Usuario usuario = usuarioDAO.findByCorreo(correo);
+        Optional<Usuario> ou = usuarioDAO.findByCorreo(correo);
+        Usuario usuario = ou.orElse(null);
         if (usuario == null) return Optional.empty();
 
         Contrasenia pass = usuario.getContraseniaEntity();
-        if (pass != null && pass.getContrasenia().equals(contraseniaIngresada)) {
+        if (pass != null && passwordEncoder.matches(contraseniaIngresada, pass.getContrasenia())) {
             return Optional.of(usuario);
         }
         return Optional.empty();
+    }
+
+    /* ==========================
+       BÚSQUEDA POR CORREO (lo pide SecurityBL)
+       ========================== */
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<Usuario> findByCorreo(String correo) {
+        return usuarioDAO.findByCorreo(correo);
     }
 
     /* ==========================
@@ -161,13 +175,14 @@ public class UsuarioBL implements UsuarioService {
     @Override
     @Transactional(readOnly = true)
     public Long findByMail(String correo) {
-        Usuario usuario = usuarioDAO.findByCorreo(correo);
-        return (usuario == null) ? 0L : usuario.getIdUsuario();
+        return usuarioDAO.findByCorreo(correo)
+                .map(Usuario::getIdUsuario)
+                .orElse(0L);
     }
 
     @Override
     public void enviarCodigoVerificacion(String correo) throws MessagingException {
-        Usuario usuario = usuarioDAO.findByCorreo(correo);
+        Usuario usuario = usuarioDAO.findByCorreo(correo).orElse(null);
         if (usuario == null)
             throw new MessagingException("No existe usuario con correo: " + correo);
 
@@ -233,24 +248,20 @@ public class UsuarioBL implements UsuarioService {
         return usuarioDAO.save(user);
     }
 
-    // ==========================
-// ENVÍO DE CREDENCIALES MANUAL
-// ==========================
+    /* ==========================
+       ENVÍO DE CREDENCIALES MANUAL
+       ========================== */
+    @Override
     public void enviarCredencialesUsuario(Usuario usuario) {
         try {
-            if (usuario == null)
-                throw new RuntimeException("Usuario no válido.");
+            if (usuario == null) throw new RuntimeException("Usuario no válido.");
 
-            String nombre = usuario.getNombre();
-            String apellido = usuario.getApellido();
-            String ci = usuario.getCi();
+            String contraseniaGenerada = buildInitialPassword(
+                    nullSafe(usuario.getNombre()),
+                    nullSafe(usuario.getApellido()),
+                    nullSafe(usuario.getCi())
+            );
 
-            // Generar la contraseña según el patrón
-            String inicialNombre = nombre.substring(0, 1).toUpperCase();
-            String apellidoMin = apellido.toLowerCase().replaceAll("\\s+", "");
-            String contraseniaGenerada = inicialNombre + apellidoMin + ci;
-
-            // Construir cuerpo del correo
             String cuerpo = """
             Estimado/a %s %s,
             
@@ -264,17 +275,33 @@ public class UsuarioBL implements UsuarioService {
             Saludos cordiales,
             Equipo USEI
             Universidad Católica Boliviana "San Pablo"
-            """.formatted(nombre, apellido, ci, contraseniaGenerada);
+            """.formatted(usuario.getNombre(), usuario.getApellido(), usuario.getCi(), contraseniaGenerada);
 
             enviarCorreo(usuario.getCorreo(), "Reenvío de credenciales - Sistema USEI", cuerpo);
-            System.out.println("📧 Credenciales reenviadas a " + usuario.getCorreo());
         } catch (Exception e) {
-            System.err.println("❌ Error al enviar credenciales: " + e.getMessage());
             throw new RuntimeException("Error al enviar credenciales: " + e.getMessage());
         }
     }
 
-
     @Override
     public boolean existsByCi(String ci) { return usuarioDAO.existsByCi(ci); }
+
+    /* ==========================
+       Helpers
+       ========================== */
+    private static String nullSafe(String s) { return (s == null) ? "" : s.trim(); }
+
+    /**
+     * Regla única para generar la clave inicial:
+     *   inicial del nombre (MAYÚS) + apellido completo en minúsculas (sin espacios) + CI
+     * Si prefieres DOS INICIALES, cambia aquí y queda consistente en toda la clase.
+     */
+    private static String buildInitialPassword(String nombre, String apellido, String ci) {
+        String inicialNombre = nombre.isEmpty() ? "" : nombre.substring(0,1).toUpperCase();
+        String apellidoMin   = apellido.toLowerCase().replaceAll("\\s+", "");
+        return inicialNombre + apellidoMin + ci;
+        // Variante con 2 iniciales:
+        // String inicialApellido = apellido.isEmpty() ? "" : apellido.substring(0,1).toUpperCase();
+        // return inicialNombre + inicialApellido + ci;
+    }
 }

@@ -12,7 +12,7 @@ public class Contrasenia {
     @Column(name = "id_pass")
     private Long idPass;
 
-    @Column(nullable = false, length = 30)
+    @Column(nullable = false, length = 100)
     private String contrasenia;
 
     @Column(name = "fecha_creacion", nullable = false)
