@@ -1,6 +1,7 @@
 package com.usei.usei.api;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 import com.usei.usei.dto.response.UsuarioResponseDTO;
 import com.usei.usei.models.Contrasenia;

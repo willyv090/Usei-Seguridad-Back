@@ -162,47 +162,47 @@ private EstadoEncuestaService estadoEncuestaService;
     }
 
     // Inicio de sesión de estudiante
-    @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequestDTO loginRequest) {
-        try{
-            Optional<Estudiante> estudiante = estudianteService.login(loginRequest.getCi(), loginRequest.getContrasena());
-            if (estudiante.isPresent()) {
-                estudiante.get().setContrasena(null); // No enviar la contraseña en la respuesta
-                Estudiante foundEstudiante = estudiante.get();
-                String token = tokenGenerator.generateToken(String.valueOf(estudiante.get().getIdEstudiante()), "estudiante", estudiante.get().getCorreoInstitucional(), 60);
+    // ❌ COMENTAR O ELIMINAR ESTE MÉTODO - Ahora se usa /auth/login
+/*
+@PostMapping("/login")
+public ResponseEntity<?> login(@RequestBody LoginRequestDTO loginRequest) {
+    try{
+        Optional<Estudiante> estudiante = estudianteService.login(loginRequest.getCi(), loginRequest.getContrasena());
+        if (estudiante.isPresent()) {
+            estudiante.get().setContrasena(null);
+            Estudiante foundEstudiante = estudiante.get();
+            String token = tokenGenerator.generateToken(String.valueOf(estudiante.get().getIdEstudiante()), "estudiante", estudiante.get().getCorreoInstitucional(), 60);
 
-                // Crear un mapa con los datos específicos del estudiante
-                Map<String, Object> data = new HashMap<>();
-                data.put("id_estudiante", foundEstudiante.getIdEstudiante());
-                data.put("rol", "estudiante");
-                data.put("ci", estudiante.get().getCi());
-                data.put("correoInstitucional", estudiante.get().getCorreoInstitucional());
-                data.put("nombre", estudiante.get().getNombre());
-                data.put("apellido", estudiante.get().getApellido());
-                data.put("telefono", estudiante.get().getTelefono());
+            Map<String, Object> data = new HashMap<>();
+            data.put("id_estudiante", foundEstudiante.getIdEstudiante());
+            data.put("rol", "estudiante");
+            data.put("ci", estudiante.get().getCi());
+            data.put("correoInstitucional", estudiante.get().getCorreoInstitucional());
+            data.put("nombre", estudiante.get().getNombre());
+            data.put("apellido", estudiante.get().getApellido());
+            data.put("telefono", estudiante.get().getTelefono());
 
-                // Crear la respuesta exitosa con los campos "ci", "correoInsitucional", "nombre" y "apellido"
-                SuccessfulResponse response = new SuccessfulResponse(
-                        "200 OK",
-                        "Inicio de sesión correcto",
-                        token,
-                        60,
-                        data
-                );
-                return ResponseEntity.ok(response);
-            } else {
-                // Crear la respuesta fallida en caso de credenciales incorrectas
-                UnsuccessfulResponse response = new UnsuccessfulResponse(
-                    "401 Unauthorized",
-                    "Credenciales incorrectas",
-                    "/estudiante/login"
-                );
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
-            }
-        } catch (Exception e) {
-            return new ResponseEntity<>(new LoginResponse(e.getMessage()), HttpStatus.INTERNAL_SERVER_ERROR);
+            SuccessfulResponse response = new SuccessfulResponse(
+                    "200 OK",
+                    "Inicio de sesión correcto",
+                    token,
+                    60,
+                    data
+            );
+            return ResponseEntity.ok(response);
+        } else {
+            UnsuccessfulResponse response = new UnsuccessfulResponse(
+                "401 Unauthorized",
+                "Credenciales incorrectas",
+                "/estudiante/login"
+            );
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
         }
+    } catch (Exception e) {
+        return new ResponseEntity<>(new LoginResponse(e.getMessage()), HttpStatus.INTERNAL_SERVER_ERROR);
     }
+}
+*/
 
     @PostMapping("/enviarEnlace")
     public ResponseEntity<?> enviarEnlaceCertificado() {
