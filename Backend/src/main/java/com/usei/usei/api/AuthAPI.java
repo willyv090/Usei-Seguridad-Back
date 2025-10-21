@@ -93,6 +93,7 @@ public class AuthAPI {
                 return ResponseEntity.status(status).body(response);
             }
             
+            
             // Login exitoso
             String tipo = (String) authResult.get("tipo");
             @SuppressWarnings("unchecked")
