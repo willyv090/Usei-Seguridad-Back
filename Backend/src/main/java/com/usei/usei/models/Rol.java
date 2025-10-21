@@ -19,7 +19,6 @@ public class Rol {
     @Column(name = "activo", nullable = false)
     private Boolean activo = Boolean.TRUE;
 
-    // ✅ accesos ahora es texto simple (VARCHAR en la BD)
     @Column(name = "accesos", length = 255)
     private String accesos;
 
@@ -37,6 +36,10 @@ public class Rol {
     public void setNombreRol(String nombreRol) { this.nombreRol = nombreRol; }
 
     public Boolean getActivo() { return activo; }
+
+    // ✅ Nuevo getter compatible con JSON y boolean primitivo
+    public boolean isActivo() { return Boolean.TRUE.equals(activo); }
+
     public void setActivo(Boolean activo) { this.activo = activo; }
 
     public String getAccesos() { return accesos; }

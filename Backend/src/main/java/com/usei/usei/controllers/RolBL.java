@@ -61,5 +61,25 @@ public class RolBL {
         return rolDAO.findByNombreRol(nombreRol).orElse(null);
     }
 
+    @Transactional
+    public Rol actualizarRol(Long idRol, Rol rolActualizado) {
+        Rol existente = rolDAO.findById(idRol)
+                .orElseThrow(() -> new RuntimeException("Rol no encontrado con ID: " + idRol));
+
+        // Evita duplicados
+        if (!existente.getNombreRol().equalsIgnoreCase(rolActualizado.getNombreRol())
+                && rolDAO.existsByNombreRol(rolActualizado.getNombreRol().trim())) {
+            throw new RuntimeException("Ya existe un rol con ese nombre.");
+        }
+
+        // Actualiza los campos modificables
+        existente.setNombreRol(rolActualizado.getNombreRol());
+        existente.setActivo(rolActualizado.getActivo());
+        existente.setAccesos(rolActualizado.getAccesos());
+
+        return rolDAO.save(existente);
+    }
+
+
 
 }
