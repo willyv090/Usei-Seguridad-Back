@@ -16,11 +16,28 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(jwtAuthInterceptor)
-                .addPathPatterns("/**")
+                .addPathPatterns("/**") // Aplicar a todas las rutas
                 .excludePathPatterns(
+                    // ======================================
+                    // AUTENTICACIÓN
+                    // ======================================
                     "/auth/**",
+                    
+                    // ======================================
+                    // MÓDULO DE SEGURIDAD (SIN TOKEN)
+                    // ======================================
+                    "/usuario/**",      // ⭐ Gestión de usuarios
+                    "/rol/**",          // ⭐ Gestión de roles
+                    
+                    // ======================================
+                    // RECUPERACIÓN DE CONTRASEÑAS
+                    // ======================================
                     "/estudiante/enviarCodigoVerificacion/**",
                     "/usuario/enviarCodigoVerificacion",
+                    
+                    // ======================================
+                    // RECURSOS PÚBLICOS
+                    // ======================================
                     "/noticia/carrusel",
                     "/documents/**",
                     "/imagenes/**"
