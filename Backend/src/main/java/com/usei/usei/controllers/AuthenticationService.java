@@ -16,15 +16,18 @@ public class AuthenticationService {
 
     @Autowired
     private UsuarioDAO usuarioDAO;
-    
+
     @Autowired
     private EstudianteDAO estudianteDAO;
-    
+
     @Autowired
     private PasswordEncoder passwordEncoder;
-    
+
     @Autowired
     private ContraseniaDAO contraseniaDAO;
+
+    @Autowired
+    private RolDAO rolDAO;
 
     /**
      * Método principal de autenticación que maneja tanto Usuario como Estudiante
@@ -32,7 +35,7 @@ public class AuthenticationService {
     @Transactional
     public Map<String, Object> authenticate(String correo, String passwordPlano) {
         Map<String, Object> result = new HashMap<>();
-        
+
         // ========================================
         // INTENTAR LOGIN COMO USUARIO
         // ========================================
@@ -40,7 +43,7 @@ public class AuthenticationService {
         if (usuarioOpt.isPresent()) {
             return authenticateUsuario(usuarioOpt.get(), passwordPlano);
         }
-        
+
         // ========================================
         // INTENTAR LOGIN COMO ESTUDIANTE
         // ========================================
@@ -48,7 +51,7 @@ public class AuthenticationService {
         if (estudianteOpt.isPresent()) {
             return authenticateEstudiante(estudianteOpt.get(), passwordPlano);
         }
-        
+
         // ========================================
         // NO SE ENCONTRÓ EL USUARIO
         // ========================================
@@ -56,21 +59,21 @@ public class AuthenticationService {
         result.put("message", "No se encontró ninguna cuenta con ese correo electrónico.");
         return result;
     }
-    
+
     /**
      * Autenticación para Usuario (usa tabla Contrasenia)
      */
     private Map<String, Object> authenticateUsuario(Usuario usuario, String passwordPlano) {
         Map<String, Object> result = new HashMap<>();
         Contrasenia contrasenia = usuario.getContraseniaEntity();
-        
+
         // Verificar que tenga contraseña configurada
         if (contrasenia == null) {
             result.put("success", false);
             result.put("message", "Usuario sin contraseña configurada");
             return result;
         }
-        
+
         // Verificar si está bloqueado
         if (contrasenia.getIntentosRestantes() <= 0) {
             result.put("success", false);
@@ -78,20 +81,20 @@ public class AuthenticationService {
             result.put("bloqueado", true);
             return result;
         }
-        
+
         // Verificar contraseña
         if (!passwordEncoder.matches(passwordPlano, contrasenia.getContrasenia())) {
             // Decrementar intentos
             int restantes = Math.max(0, contrasenia.getIntentosRestantes() - 1);
             contrasenia.setIntentosRestantes(restantes);
             contraseniaDAO.save(contrasenia);
-            
+
             result.put("success", false);
             result.put("message", "Credenciales incorrectas. Intentos restantes: " + restantes);
             result.put("intentosRestantes", restantes);
             return result;
         }
-        
+
         // Verificar expiración de contraseña
         LocalDate fechaCreacion = contrasenia.getFechaCreacion();
         if (fechaCreacion != null && LocalDate.now().isAfter(fechaCreacion.plusDays(60))) {
@@ -101,101 +104,117 @@ public class AuthenticationService {
             result.put("idUsuario", usuario.getIdUsuario());
             return result;
         }
-        
+
         // Login exitoso - resetear intentos y actualizar último login
         contrasenia.setIntentosRestantes(3);
         contrasenia.setUltimoLog(LocalDate.now());
         contraseniaDAO.save(contrasenia);
-        
-        // Obtener accesos del rol
+
+        // ======================================================
+        // 🔹 OBTENER ACCESOS DESDE EL ROL Y GUARDAR EN DATA
+        // ======================================================
         List<String> accesos = parseAccesos(usuario.getRolEntity());
-        
+
+        // Crear objeto interno "data" con todos los datos del usuario
+        Map<String, Object> data = new HashMap<>();
+        data.put("id_usuario", usuario.getIdUsuario());
+        data.put("tipo", "usuario");
+        data.put("correo", usuario.getCorreo());
+        data.put("nombre", usuario.getNombre());
+        data.put("apellido", usuario.getApellido());
+        data.put("rol", usuario.getRol());
+        data.put("carrera", usuario.getCarrera());
+        data.put("cambioContrasenia", usuario.getCambioContrasenia());
+        data.put("accesos", accesos); // se agregan los accesos dentro de data
+
         result.put("success", true);
         result.put("tipo", "usuario");
-        result.put("data", usuario);
-        result.put("accesos", accesos);
+        result.put("data", data);
+        result.put("accesos", accesos); // también afuera 
         result.put("cambioContrasenia", usuario.getCambioContrasenia());
         return result;
     }
-    
+
     /**
      * Autenticación para Estudiante (usa campo contrasena hasheado con BCrypt)
      */
     private Map<String, Object> authenticateEstudiante(Estudiante estudiante, String passwordPlano) {
         Map<String, Object> result = new HashMap<>();
         String contrasenaHasheada = estudiante.getContrasena();
-        
+
         // Verificar que tenga contraseña
         if (contrasenaHasheada == null || contrasenaHasheada.isEmpty()) {
             result.put("success", false);
             result.put("message", "Estudiante sin contraseña configurada");
             return result;
         }
-        
+
         // Verificar contraseña
-        // Si la contraseña NO está hasheada (empieza con texto plano), hashearla
         if (!contrasenaHasheada.startsWith("$2a$") && !contrasenaHasheada.startsWith("$2b$")) {
-            // Es contraseña en texto plano, verificar directamente
             if (!contrasenaHasheada.equals(passwordPlano)) {
                 result.put("success", false);
                 result.put("message", "Credenciales incorrectas");
                 return result;
             }
-            // TODO: Aquí podrías hashear la contraseña para la próxima vez
         } else {
-            // Es contraseña hasheada, verificar con BCrypt
             if (!passwordEncoder.matches(passwordPlano, contrasenaHasheada)) {
                 result.put("success", false);
                 result.put("message", "Credenciales incorrectas");
                 return result;
             }
         }
-        
-        // Login exitoso
-        // Estudiantes tienen acceso limitado predefinido
+
+        // Accesos predefinidos para estudiantes
         List<String> accesos = Arrays.asList(
-            "dashboard", 
-            "encuestas", 
-            "certificados", 
-            "notificaciones",
-            "perfil"
+                "Encuesta de graduación",
+                "Certificados de estudiantes"
         );
-        
+
+        // Crear objeto data
+        Map<String, Object> data = new HashMap<>();
+        data.put("id_estudiante", estudiante.getIdEstudiante());
+        data.put("tipo", "estudiante");
+        data.put("correo", estudiante.getCorreoInstitucional());
+        data.put("nombre", estudiante.getNombre());
+        data.put("apellido", estudiante.getApellido());
+        data.put("ci", estudiante.getCi());
+        data.put("carrera", estudiante.getCarrera());
+        data.put("accesos", accesos); // ✅ Agregar accesos dentro de data
+
         result.put("success", true);
         result.put("tipo", "estudiante");
-        result.put("data", estudiante);
+        result.put("data", data);
         result.put("accesos", accesos);
         return result;
     }
-    
+
     /**
-     * Parsea los accesos del rol desde formato CSV
+     * Parsea los accesos del rol desde formato CSV (campo texto)
      */
     private List<String> parseAccesos(Rol rol) {
         if (rol == null || rol.getAccesos() == null || rol.getAccesos().isEmpty()) {
             return new ArrayList<>();
         }
-        
-        // Los accesos están guardados como CSV: "usuarios,roles,reportes"
+
+        // Los accesos están guardados como CSV: "Gestión de contraseñas,Gestión de usuarios y roles"
         String[] accesosArray = rol.getAccesos().split(",");
         List<String> resultado = new ArrayList<>();
-        
+
         for (String acceso : accesosArray) {
             String accesoLimpio = acceso.trim();
             if (!accesoLimpio.isEmpty()) {
                 resultado.add(accesoLimpio);
             }
         }
-        
         return resultado;
     }
-    
+
     /**
      * Verifica si un rol tiene un acceso específico
      */
     public boolean tieneAcceso(Rol rol, String accesoRequerido) {
         List<String> accesos = parseAccesos(rol);
         return accesos.stream()
-            .anyMatch(acceso -> acceso.equalsIgnoreCase(accesoRequerido));
+                .anyMatch(acceso -> acceso.equalsIgnoreCase(accesoRequerido));
     }
 }

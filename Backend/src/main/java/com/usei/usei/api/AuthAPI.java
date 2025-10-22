@@ -95,53 +95,43 @@ public class AuthAPI {
             
             
             // Login exitoso
-            String tipo = (String) authResult.get("tipo");
+           String tipo = (String) authResult.get("tipo");
+            @SuppressWarnings("unchecked")
+            Map<String, Object> data = (Map<String, Object>) authResult.get("data"); // ✅ ahora data es un Map
             @SuppressWarnings("unchecked")
             List<String> accesos = (List<String>) authResult.get("accesos");
-            
-            Map<String, Object> data = new HashMap<>();
+
             String token = "";
-            
+
             if ("usuario".equals(tipo)) {
-                Usuario usuario = (Usuario) authResult.get("data");
-                usuario.setContraseniaEntity(null); // No enviar la contraseña
-                
+                // ya no hacemos cast a Usuario
+                String idUsuario = String.valueOf(data.get("id_usuario"));
+                String correoUsuario = (String) data.get("correo");
+
                 token = tokenGenerator.generateToken(
-                    String.valueOf(usuario.getIdUsuario()),
+                    idUsuario,
                     "usuario",
-                    usuario.getCorreo(),
+                    correoUsuario,
                     60
                 );
-                
-                data.put("id_usuario", usuario.getIdUsuario());
-                data.put("tipo", "usuario");
-                data.put("correo", usuario.getCorreo());
-                data.put("nombre", usuario.getNombre());
-                data.put("apellido", usuario.getApellido());
-                data.put("rol", usuario.getRol());
-                data.put("carrera", usuario.getCarrera());
-                data.put("cambioContrasenia", authResult.get("cambioContrasenia"));
-                
+
             } else if ("estudiante".equals(tipo)) {
-                Estudiante estudiante = (Estudiante) authResult.get("data");
-                estudiante.setContrasena(null); // No enviar la contraseña
-                
+                String idEstudiante = String.valueOf(data.get("id_estudiante"));
+                String correoEstudiante = (String) data.get("correo");
+
                 token = tokenGenerator.generateToken(
-                    String.valueOf(estudiante.getIdEstudiante()),
+                    idEstudiante,
                     "estudiante",
-                    estudiante.getCorreoInstitucional(),
+                    correoEstudiante,
                     60
                 );
-                
-                data.put("id_estudiante", estudiante.getIdEstudiante());
-                data.put("tipo", "estudiante");
-                data.put("correo", estudiante.getCorreoInstitucional());
-                data.put("nombre", estudiante.getNombre());
-                data.put("apellido", estudiante.getApellido());
-                data.put("ci", estudiante.getCi());
-                data.put("carrera", estudiante.getCarrera());
             }
-            
+
+            //Agregar accesos dentro de data 
+            if (!data.containsKey("accesos") && accesos != null) {
+                data.put("accesos", accesos);
+            }
+
             LoginResponseDTO response = new LoginResponseDTO(
                 "200 OK",
                 "Inicio de sesión correcto",
@@ -150,8 +140,9 @@ public class AuthAPI {
                 data,
                 accesos
             );
-            
+
             return ResponseEntity.ok(response);
+
             
         } catch (Exception e) {
             e.printStackTrace();
