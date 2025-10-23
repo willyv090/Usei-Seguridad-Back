@@ -55,11 +55,19 @@ public class UsuarioBL implements UsuarioService {
     @Override
     @Transactional
     public Usuario save(Usuario usuario) {
-        // Evitar duplicados de CI en otros usuarios
-        Optional<Usuario> existente = usuarioDAO.findByCi(usuario.getCi());
-        if (existente.isPresent() && !existente.get().getIdUsuario().equals(usuario.getIdUsuario())) {
+        // Verificación de no duplicados de CI y Correos institucionales al crear usuario
+        Optional<Usuario> existentePorCi = usuarioDAO.findByCi(usuario.getCi());
+        if (existentePorCi.isPresent() && !existentePorCi.get().getIdUsuario().equals(usuario.getIdUsuario())) {
             throw new RuntimeException("Ya existe un usuario con el CI " + usuario.getCi());
         }
+
+        if (usuario.getCorreo() != null && !usuario.getCorreo().isBlank()) {
+            Optional<Usuario> existentePorCorreo = usuarioDAO.findByCorreo(usuario.getCorreo());
+            if (existentePorCorreo.isPresent() && !existentePorCorreo.get().getIdUsuario().equals(usuario.getIdUsuario())) {
+                throw new RuntimeException("Ya existe un usuario con el correo " + usuario.getCorreo());
+            }
+        }
+
 
         // Generar contraseña por defecto si no tiene aún
         if (usuario.getContraseniaEntity() == null) {

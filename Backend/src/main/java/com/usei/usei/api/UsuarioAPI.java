@@ -306,6 +306,26 @@ public class UsuarioAPI {
     }
 
     // ===========================
+        // VERIFICAR DUPLICADOS (correo / ci)
+        // ===========================
+    @GetMapping("/verificar")
+    public ResponseEntity<?> verificarDuplicados(
+            @RequestParam(required = false) String correo,
+            @RequestParam(required = false) String ci) {
+
+        try {
+            Map<String, Boolean> result = new HashMap<>();
+            result.put("existeCorreo", correo != null && usuarioService.findByCorreo(correo).isPresent());
+            result.put("existeCi", ci != null && usuarioService.existsByCi(ci));
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error al verificar duplicados: " + e.getMessage());
+        }
+    }
+
+
+    // ===========================
     // LOGIN
     // ===========================
     @PostMapping("/login")
