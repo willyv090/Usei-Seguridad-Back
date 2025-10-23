@@ -4,9 +4,8 @@ import com.usei.usei.controllers.AuthenticationService;
 import com.usei.usei.dto.request.UnifiedLoginRequest;
 import com.usei.usei.dto.response.LoginResponseDTO;
 import com.usei.usei.dto.UnsuccessfulResponse;
-import com.usei.usei.models.Estudiante;
-import com.usei.usei.models.Usuario;
 import com.usei.usei.util.TokenGenerator;
+import com.usei.usei.services.CaptchaService;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -28,6 +27,9 @@ public class AuthAPI {
     @Autowired
     private TokenGenerator tokenGenerator;
 
+     @Autowired
+    private CaptchaService captchaService; 
+
     /**
      * Endpoint unificado de login para Usuario y Estudiante
      * POST /auth/login
@@ -35,6 +37,28 @@ public class AuthAPI {
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody UnifiedLoginRequest request) {
         try {
+            if (request.getCaptchaToken() == null || request.getCaptchaToken().isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+                    new UnsuccessfulResponse(
+                        "400 Bad Request",
+                        "El token de reCAPTCHA es obligatorio",
+                        "/auth/login"
+                    )
+                );
+            }
+
+            // 2. Validar el captcha con Google
+            boolean captchaValido = captchaService.verifyCaptcha(request.getCaptchaToken());
+            if (!captchaValido) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
+                    new UnsuccessfulResponse(
+                        "403 Forbidden",
+                        "Verificación de reCAPTCHA fallida. Por favor, inténtelo de nuevo.",
+                        "/auth/login"
+                    )
+                );
+            }
+
             // Validar que vengan los datos requeridos
             if (request.getCorreo() == null || request.getCorreo().trim().isEmpty()) {
                 return ResponseEntity.badRequest().body(
@@ -97,14 +121,13 @@ public class AuthAPI {
             // Login exitoso
            String tipo = (String) authResult.get("tipo");
             @SuppressWarnings("unchecked")
-            Map<String, Object> data = (Map<String, Object>) authResult.get("data"); // ✅ ahora data es un Map
+            Map<String, Object> data = (Map<String, Object>) authResult.get("data"); 
             @SuppressWarnings("unchecked")
             List<String> accesos = (List<String>) authResult.get("accesos");
 
             String token = "";
 
             if ("usuario".equals(tipo)) {
-                // ya no hacemos cast a Usuario
                 String idUsuario = String.valueOf(data.get("id_usuario"));
                 String correoUsuario = (String) data.get("correo");
 
