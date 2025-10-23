@@ -85,6 +85,10 @@ public class Estudiante implements Serializable {
     @Column(name = "contrasena")
     private String contrasena;
 
+    @Basic(optional = false)
+    @Column(name = "intentos_restantes")
+    private int intentosRestantes = 3;
+
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "estudianteIdEstudiante")
     @JsonIgnore
     private Collection<EstadoEncuesta> estadoEncuestaCollection;
@@ -229,6 +233,14 @@ public class Estudiante implements Serializable {
 
     public void setContrasena(String contrasena) {
         this.contrasena = contrasena;
+    }
+
+    public int getIntentosRestantes() {
+        return intentosRestantes;
+    }
+
+    public void setIntentosRestantes(int intentosRestantes) {
+        this.intentosRestantes = intentosRestantes;
     }
 
     public Collection<EstadoEncuesta> getEstadoEncuestaCollection() {

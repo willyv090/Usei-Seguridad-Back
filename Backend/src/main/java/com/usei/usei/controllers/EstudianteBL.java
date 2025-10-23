@@ -1,9 +1,12 @@
 package com.usei.usei.controllers;
 
+import com.usei.usei.models.Estudiante;
+import com.usei.usei.repositories.EstudianteDAO;
+import jakarta.mail.MessagingException;
+import jakarta.mail.internet.MimeMessage;
 import java.security.SecureRandom;
 import java.util.List;
 import java.util.Optional;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -12,12 +15,6 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import com.usei.usei.models.Estudiante;
-import com.usei.usei.repositories.EstudianteDAO;
-
-import jakarta.mail.MessagingException;
-import jakarta.mail.internet.MimeMessage;
 
 @Service
 public class EstudianteBL implements EstudianteService {
@@ -32,7 +29,7 @@ public class EstudianteBL implements EstudianteService {
     private String codigoVerificacion;
 
     @Autowired
-    public EstudianteBL(EstudianteDAO estudianteDAO, JavaMailSender mailSender) {
+    public EstudianteBL(EstudianteDAO estudianteDAO, JavaMailSender mailSender, SecurityBL securityBL) {
         this.estudianteDAO = estudianteDAO;
         this.mailSender = mailSender;
     }

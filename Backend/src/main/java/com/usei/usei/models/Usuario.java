@@ -1,11 +1,10 @@
 package com.usei.usei.models;
 
-import java.io.Serializable;
-import java.util.Collection;
-
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
+import java.io.Serializable;
+import java.util.Collection;
 
 @Entity
 @Table(name = "usuario")
@@ -60,6 +59,10 @@ public class Usuario implements Serializable {
 
     @Column(name = "cambio_contrasenia")
     private Boolean cambioContrasenia = true;
+
+    @Basic(optional = false)
+    @Column(name = "intentos_restantes")
+    private int intentosRestantes = 3;
 
     // ====== Relaciones ======
     @ManyToOne(fetch = FetchType.LAZY)
@@ -137,6 +140,9 @@ public class Usuario implements Serializable {
 
     public Boolean getCambioContrasenia() { return cambioContrasenia; }
     public void setCambioContrasenia(Boolean cambioContrasenia) { this.cambioContrasenia = cambioContrasenia; }
+
+    public int getIntentosRestantes() { return intentosRestantes; }
+    public void setIntentosRestantes(int intentosRestantes) { this.intentosRestantes = intentosRestantes; }
 
     public Rol getRolEntity() { return rolEntity; }
     public void setRolEntity(Rol rolEntity) { this.rolEntity = rolEntity; }
