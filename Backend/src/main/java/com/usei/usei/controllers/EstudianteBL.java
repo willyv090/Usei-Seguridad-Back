@@ -1,9 +1,12 @@
 package com.usei.usei.controllers;
 
+import com.usei.usei.models.Estudiante;
+import com.usei.usei.repositories.EstudianteDAO;
+import jakarta.mail.MessagingException;
+import jakarta.mail.internet.MimeMessage;
 import java.security.SecureRandom;
 import java.util.List;
 import java.util.Optional;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -12,17 +15,12 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.usei.usei.models.Estudiante;
-import com.usei.usei.repositories.EstudianteDAO;
-
-import jakarta.mail.MessagingException;
-import jakarta.mail.internet.MimeMessage;
-
 @Service
 public class EstudianteBL implements EstudianteService{
 
     final private EstudianteDAO estudianteDAO;
     final private JavaMailSender mailSender;
+    final private SecurityBL securityBL;
 
     private String codigoVerificacion;
 
@@ -34,9 +32,10 @@ public class EstudianteBL implements EstudianteService{
     }
 
     @Autowired
-    public EstudianteBL(EstudianteDAO estudianteDAO, JavaMailSender mailSender) {
+    public EstudianteBL(EstudianteDAO estudianteDAO, JavaMailSender mailSender, SecurityBL securityBL) {
         this.estudianteDAO = estudianteDAO;
-        this.mailSender = mailSender;  // Inyección de mailSender
+        this.mailSender = mailSender;
+        this.securityBL = securityBL;
     }
 
     @Override
@@ -83,7 +82,57 @@ public class EstudianteBL implements EstudianteService{
     @Override
     @Transactional(readOnly = true)
     public Optional<Estudiante> login(int ci, String contrasena) {
-        return estudianteDAO.findByCiAndContrasena(ci, contrasena);
+        // Legacy direct match (used for plain-stored passwords)
+        Optional<Estudiante> direct = estudianteDAO.findByCiAndContrasena(ci, contrasena);
+        if (direct.isPresent()) return direct;
+
+        // If plain match failed, check with attempt-decrement logic
+        Optional<Estudiante> o = estudianteDAO.findByCiForUpdate(ci);
+        if (o.isEmpty()) return Optional.empty();
+        Estudiante e = o.get();
+
+        // If attempts exhausted, return empty (caller should treat as blocked)
+        if (e.getIntentosRestantes() <= 0) return Optional.empty();
+
+        // Compare plain passwords (no hashing for Estudiante in current model)
+        if (!contrasena.equals(e.getContrasena())) {
+            int rest = Math.max(0, e.getIntentosRestantes() - 1);
+            estudianteDAO.updateIntentosByCi(ci, rest);
+            e.setIntentosRestantes(rest);
+            return Optional.empty();
+        }
+
+        // Successful login: reset attempts
+        estudianteDAO.updateIntentosByCi(ci, 3);
+        e.setIntentosRestantes(3);
+        return Optional.of(e);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<Estudiante> findByCi(int ci) {
+        return estudianteDAO.findByCi(ci);
+    }
+
+    @Override
+    @Transactional
+    public LoginStatus loginWithStatus(int ci, String contrasena) {
+        // Use pessimistic locking to prevent concurrent modifications
+        Optional<Estudiante> estudianteOpt = estudianteDAO.findByCiForUpdate(ci);
+        
+        if (estudianteOpt.isEmpty()) {
+            return LoginStatus.CREDENCIALES;
+        }
+        
+        Estudiante estudiante = estudianteOpt.get();
+        
+        // Use SecurityBL for consistent login attempt handling across all user types
+        LoginStatus status = securityBL.loginEstudiante(estudiante, contrasena);
+        
+        // Save the updated estudiante (attempts may have been modified)
+        estudianteDAO.save(estudiante);
+        
+        return status;
     }
 
     @Override

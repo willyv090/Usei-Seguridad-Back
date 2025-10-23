@@ -1,14 +1,11 @@
 package com.usei.usei.controllers;
 
+import com.usei.usei.models.Estudiante;
+import jakarta.mail.MessagingException;
 import java.util.List;
 import java.util.Optional;
-
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-
-import com.usei.usei.models.Estudiante;
-
-import jakarta.mail.MessagingException;
 
 public interface EstudianteService {
 
@@ -23,6 +20,11 @@ public interface EstudianteService {
     public Estudiante update (Estudiante newEstudiante, Long id);
 
     public Optional<Estudiante> login(int ci, String contrasena);
+    
+    // New unified login method that returns LoginStatus for consistency with Usuario login
+    public LoginStatus loginWithStatus(int ci, String contrasena);
+    
+    Optional<Estudiante> findByCi(int ci);
 
     // Método para enviar el correo
     public void enviarCorreosEstudiantes() throws MessagingException;

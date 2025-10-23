@@ -33,6 +33,7 @@ import com.usei.usei.controllers.EstadoCertificadoService;
 import com.usei.usei.controllers.EstadoEncuestaService;
 import com.usei.usei.controllers.EstudianteBL;
 import com.usei.usei.controllers.EstudianteService;
+import com.usei.usei.controllers.LoginStatus;
 import com.usei.usei.dto.SuccessfulResponse;
 import com.usei.usei.dto.UnsuccessfulResponse;
 import com.usei.usei.dto.request.LoginRequestDTO;
@@ -165,42 +166,69 @@ private EstadoEncuestaService estadoEncuestaService;
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequestDTO loginRequest) {
         try{
-            Optional<Estudiante> estudiante = estudianteService.login(loginRequest.getCi(), loginRequest.getContrasena());
-            if (estudiante.isPresent()) {
-                estudiante.get().setContrasena(null); // No enviar la contraseña en la respuesta
-                Estudiante foundEstudiante = estudiante.get();
-                String token = tokenGenerator.generateToken(String.valueOf(estudiante.get().getIdEstudiante()), "estudiante", estudiante.get().getCorreoInstitucional(), 60);
+            // Use unified LoginStatus approach for consistency with Usuario login
+            LoginStatus status = estudianteService.loginWithStatus(loginRequest.getCi(), loginRequest.getContrasena());
+            
+            switch (status) {
+                case OK: {
+                    // Successful login - get student data
+                    Optional<Estudiante> estudianteOpt = estudianteService.findByCi(loginRequest.getCi());
+                    if (estudianteOpt.isPresent()) {
+                        Estudiante estudiante = estudianteOpt.get();
+                        estudiante.setContrasena(null); // Don't send password in response
+                        
+                        String token = tokenGenerator.generateToken(
+                            String.valueOf(estudiante.getIdEstudiante()), 
+                            "estudiante", 
+                            estudiante.getCorreoInstitucional(), 
+                            60
+                        );
 
-                // Crear un mapa con los datos específicos del estudiante
-                Map<String, Object> data = new HashMap<>();
-                data.put("id_estudiante", foundEstudiante.getIdEstudiante());
-                data.put("rol", "estudiante");
-                data.put("ci", estudiante.get().getCi());
-                data.put("correoInstitucional", estudiante.get().getCorreoInstitucional());
-                data.put("nombre", estudiante.get().getNombre());
-                data.put("apellido", estudiante.get().getApellido());
-                data.put("telefono", estudiante.get().getTelefono());
+                        // Create response data
+                        Map<String, Object> data = new HashMap<>();
+                        data.put("id_estudiante", estudiante.getIdEstudiante());
+                        data.put("rol", "estudiante");
+                        data.put("ci", estudiante.getCi());
+                        data.put("correoInstitucional", estudiante.getCorreoInstitucional());
+                        data.put("nombre", estudiante.getNombre());
+                        data.put("apellido", estudiante.getApellido());
+                        data.put("telefono", estudiante.getTelefono());
 
-                // Crear la respuesta exitosa con los campos "ci", "correoInsitucional", "nombre" y "apellido"
-                SuccessfulResponse response = new SuccessfulResponse(
-                        "200 OK",
-                        "Inicio de sesión correcto",
-                        token,
-                        60,
-                        data
-                );
-                return ResponseEntity.ok(response);
-            } else {
-                // Crear la respuesta fallida en caso de credenciales incorrectas
-                UnsuccessfulResponse response = new UnsuccessfulResponse(
-                    "401 Unauthorized",
-                    "Credenciales incorrectas",
-                    "/estudiante/login"
-                );
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+                        SuccessfulResponse response = new SuccessfulResponse(
+                                "200 OK",
+                                "Inicio de sesión correcto",
+                                token,
+                                60,
+                                data
+                        );
+                        return ResponseEntity.ok(response);
+                    }
+                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Estudiante no encontrado tras validación");
+                }
+                case BLOQUEADO: {
+                    UnsuccessfulResponse blocked = new UnsuccessfulResponse(
+                            "403 Forbidden",
+                            "Cuenta bloqueada por intentos fallidos. Use recuperación de contraseña.",
+                            "/estudiante/recover"
+                    );
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(blocked);
+                }
+                case CREDENCIALES: {
+                    // Get remaining attempts for user feedback
+                    Optional<Estudiante> existing = estudianteService.findByCi(loginRequest.getCi());
+                    int remaining = existing.isPresent() ? existing.get().getIntentosRestantes() : 0;
+                    
+                    Map<String,Object> payload = new HashMap<>();
+                    payload.put("status","401 Unauthorized");
+                    payload.put("message","Credenciales incorrectas");
+                    payload.put("remainingAttempts", remaining);
+                    return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(payload);
+                }
+                default:
+                    return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new UnsuccessfulResponse("401", "Credenciales incorrectas", "/estudiante/login"));
             }
         } catch (Exception e) {
-            return new ResponseEntity<>(new LoginResponse(e.getMessage()), HttpStatus.INTERNAL_SERVER_ERROR);
+            return new ResponseEntity<>(new LoginResponse<Object>(e.getMessage()), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 

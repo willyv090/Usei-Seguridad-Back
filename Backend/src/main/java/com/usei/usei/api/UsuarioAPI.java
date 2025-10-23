@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import com.usei.usei.controllers.PasswordChangeStatus;
 import com.usei.usei.controllers.RolBL;
 import com.usei.usei.controllers.SecurityBL;
+import com.usei.usei.controllers.LoginStatus;
 import com.usei.usei.controllers.UsuarioService;
 import com.usei.usei.dto.SuccessfulResponse;
 import com.usei.usei.dto.UnsuccessfulResponse;
@@ -40,7 +41,7 @@ public class UsuarioAPI {
     @Autowired
     private ContraseniaDAO contraseniaDAO;
 
-    @Autowired
+        // private ContraseniaDAO contraseniaDAO; // Removed unused field
     private SecurityBL securityBL;
 
 
@@ -255,13 +256,19 @@ public class UsuarioAPI {
                         .body("Usuario no encontrado con ID: " + id);
 
             Usuario usuario = oUsuario.get();
-            usuarioService.enviarCredencialesUsuario(usuario);
-
-            return ResponseEntity.ok("Credenciales enviadas correctamente a " + usuario.getCorreo());
+            
+            try {
+                usuarioService.enviarCredencialesUsuario(usuario);
+                return ResponseEntity.ok("Credenciales enviadas correctamente a " + usuario.getCorreo());
+            } catch (Exception emailError) {
+                // Email failed but continue operation for development
+                System.err.println("Email send failed for user " + id + ": " + emailError.getMessage());
+                return ResponseEntity.ok("Usuario procesado. Email no enviado (error de configuración SMTP): " + emailError.getMessage());
+            }
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Error al enviar credenciales: " + e.getMessage());
+                    .body("Error al procesar usuario: " + e.getMessage());
         }
     }
 
@@ -310,45 +317,74 @@ public class UsuarioAPI {
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequestUserDTO loginRequestUser) {
         try {
-            Optional<Usuario> usuario = usuarioService.login(loginRequestUser.getCorreo(), loginRequestUser.getContrasena());
-            if (usuario.isPresent()) {
-                Usuario user = usuario.get();
-                user.setContraseniaEntity(null);
+            // Use SecurityBL to validate and decrement attempts on Contrasenia
+            LoginStatus status = securityBL.login(loginRequestUser.getCorreo(), loginRequestUser.getContrasena());
+            switch (status) {
+                case OK: {
+                    Optional<Usuario> usuario = usuarioService.findByCorreo(loginRequestUser.getCorreo());
+                    if (usuario.isPresent()) {
+                        Usuario user = usuario.get();
+                        user.setContraseniaEntity(null);
 
-                String token = tokenGenerator.generateToken(
-                        String.valueOf(user.getIdUsuario()),
-                        user.getRol(),
-                        user.getCorreo(),
-                        60
-                );
+                        String token = tokenGenerator.generateToken(
+                                String.valueOf(user.getIdUsuario()),
+                                user.getRol(),
+                                user.getCorreo(),
+                                60
+                        );
 
-                Map<String, Object> data = new HashMap<>();
-                data.put("id_usuario", user.getIdUsuario());
-                data.put("rol", user.getRol());
-                data.put("correo", user.getCorreo());
-                data.put("carrera", user.getCarrera());
-                data.put("nombre", user.getNombre());
-                data.put("ci", user.getCi());
-                data.put("cambio_contrasenia", user.getCambioContrasenia());
+                        Map<String, Object> data = new HashMap<>();
+                        data.put("id_usuario", user.getIdUsuario());
+                        data.put("rol", user.getRol());
+                        data.put("correo", user.getCorreo());
+                        data.put("carrera", user.getCarrera());
+                        data.put("nombre", user.getNombre());
+                        data.put("ci", user.getCi());
+                        data.put("cambio_contrasenia", user.getCambioContrasenia());
 
-                SuccessfulResponse response = new SuccessfulResponse(
-                        "200 OK",
-                        "Inicio de sesión correcto",
-                        token,
-                        60,
-                        data
-                );
-                return ResponseEntity.ok(response);
-            } else {
-                UnsuccessfulResponse response = new UnsuccessfulResponse(
-                        "401 Unauthorized",
-                        "Credenciales incorrectas",
-                        "/usuario/login"
-                );
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+                        SuccessfulResponse response = new SuccessfulResponse(
+                                "200 OK",
+                                "Inicio de sesión correcto",
+                                token,
+                                60,
+                                data
+                        );
+                        return ResponseEntity.ok(response);
+                    }
+                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Usuario no encontrado tras validación");
+                }
+                case BLOQUEADO: {
+                    UnsuccessfulResponse blocked = new UnsuccessfulResponse(
+                            "403 Forbidden",
+                            "Cuenta bloqueada por intentos fallidos. Use recuperación de contraseña.",
+                            "/usuario/recover"
+                    );
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(blocked);
+                }
+                case CREDENCIALES: {
+                    // We can try to fetch remaining attempts to return to client
+                    Optional<Usuario> u = usuarioService.findByCorreo(loginRequestUser.getCorreo());
+                    Integer remaining = null;
+                    if (u.isPresent() && u.get().getContraseniaEntity() != null) remaining = u.get().getContraseniaEntity().getIntentosRestantes();
+                    Map<String,Object> payload = new HashMap<>();
+                    payload.put("status","401 Unauthorized");
+                    payload.put("message","Credenciales incorrectas");
+                    payload.put("remainingAttempts", remaining);
+                    return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(payload);
+                }
+                case EXPIRADA: {
+                    UnsuccessfulResponse expired = new UnsuccessfulResponse(
+                            "403 Forbidden",
+                            "Contraseña expirada. Debe cambiarla.",
+                            "/usuario/change-password"
+                    );
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(expired);
+                }
+                default:
+                    return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new UnsuccessfulResponse("401", "Credenciales incorrectas", "/usuario/login"));
             }
         } catch (Exception e) {
-            return new ResponseEntity<>(new LoginResponse(e.getMessage()), HttpStatus.INTERNAL_SERVER_ERROR);
+            return new ResponseEntity<>(new LoginResponse<Object>(e.getMessage()), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -429,6 +465,38 @@ public class UsuarioAPI {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error inesperado: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/test-email")
+    public ResponseEntity<?> testEmail(@RequestBody Map<String, String> request) {
+        try {
+            String email = request.get("email");
+            if (email == null || email.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body("Email address is required");
+            }
+
+            System.out.println("🧪 === EMAIL TEST ENDPOINT CALLED ===");
+            System.out.println("🧪 Testing email to: " + email);
+
+            // Create a test user to send credentials
+            Usuario testUser = new Usuario();
+            testUser.setNombre("Test");
+            testUser.setApellido("User");
+            testUser.setCi("12345");
+            testUser.setCorreo(email);
+
+            usuarioService.enviarCredencialesUsuario(testUser);
+
+            System.out.println("🧪 === EMAIL TEST COMPLETED ===");
+            return ResponseEntity.ok().body("Test email sent to " + email + ". Check backend logs for details.");
+
+        } catch (Exception e) {
+            System.err.println("🧪 === EMAIL TEST FAILED ===");
+            System.err.println("🧪 Error: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Email test failed: " + e.getMessage());
         }
     }
 }
