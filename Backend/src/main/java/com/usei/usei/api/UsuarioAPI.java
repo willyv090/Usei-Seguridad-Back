@@ -4,7 +4,6 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import com.usei.usei.dto.response.UsuarioResponseDTO;
-import com.usei.usei.models.Contrasenia;
 import com.usei.usei.repositories.ContraseniaDAO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -24,7 +23,7 @@ import com.usei.usei.models.Rol;
 import com.usei.usei.models.Usuario;
 import com.usei.usei.util.TokenGenerator;
 
-import jakarta.mail.MessagingException;
+import jakarta.annotation.PostConstruct;
 
 @RestController
 @RequestMapping("/usuario")
@@ -42,8 +41,23 @@ public class UsuarioAPI {
     @Autowired
     private ContraseniaDAO contraseniaDAO;
 
-        // private ContraseniaDAO contraseniaDAO; // Removed unused field
+    @Autowired
     private SecurityBL securityBL;
+
+    // Constructor for debugging dependency injection
+    public UsuarioAPI() {
+        System.out.println("🔧 UsuarioAPI constructor called");
+    }
+
+    @PostConstruct
+    public void init() {
+        System.out.println("🔧 UsuarioAPI @PostConstruct called");
+        System.out.println("🔧 usuarioService: " + (usuarioService != null ? "OK" : "NULL"));
+        System.out.println("🔧 tokenGenerator: " + (tokenGenerator != null ? "OK" : "NULL"));
+        System.out.println("🔧 rolBL: " + (rolBL != null ? "OK" : "NULL"));
+        System.out.println("🔧 contraseniaDAO: " + (contraseniaDAO != null ? "OK" : "NULL"));
+        System.out.println("🔧 securityBL: " + (securityBL != null ? "OK" : "NULL"));
+    }
 
 
     // ===========================
@@ -283,12 +297,27 @@ public class UsuarioAPI {
     public ResponseEntity<?> changePassword(@RequestParam Long idUsuario,
                                             @RequestBody HashMap<String, String> body) {
         try {
+            System.out.println("🔍 === CHANGE PASSWORD DEBUG ===");
+            System.out.println("🔍 idUsuario: " + idUsuario);
+            System.out.println("🔍 securityBL is null? " + (securityBL == null));
+            System.out.println("🔍 usuarioService is null? " + (usuarioService == null));
+            System.out.println("🔍 tokenGenerator is null? " + (tokenGenerator == null));
+            System.out.println("🔍 rolBL is null? " + (rolBL == null));
+            
+            if (securityBL == null) {
+                System.err.println("❌ SecurityBL is null! Dependency injection failed!");
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body("Error de configuración: SecurityBL no está disponible. Contacte al administrador.");
+            }
+            
             String nuevaPassStr = body.get("newPassword");
             if (nuevaPassStr == null || nuevaPassStr.isBlank()) {
                 return ResponseEntity.badRequest().body("La nueva contraseña no puede estar vacía.");
             }
 
+            System.out.println("🔍 Calling securityBL.changePassword...");
             PasswordChangeStatus status = securityBL.changePassword(idUsuario, nuevaPassStr);
+            System.out.println("🔍 Password change status: " + status);
 
             switch (status) {
                 case CAMBIO_OK:
@@ -306,6 +335,8 @@ public class UsuarioAPI {
                     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("No se pudo cambiar la contraseña.");
             }
         } catch (Exception e) {
+            System.err.println("❌ Exception in changePassword: " + e.getClass().getSimpleName());
+            System.err.println("❌ Message: " + e.getMessage());
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error al cambiar la contraseña: " + e.getMessage());
@@ -380,6 +411,14 @@ public class UsuarioAPI {
                             "/usuario/change-password"
                     );
                     return ResponseEntity.status(HttpStatus.FORBIDDEN).body(expired);
+                }
+                case POLITICA_ACTUALIZADA: {
+                    UnsuccessfulResponse policyUpdated = new UnsuccessfulResponse(
+                            "403 Forbidden",
+                            "Las políticas de seguridad han sido actualizadas. Debe cambiar su contraseña para cumplir con los nuevos requisitos.",
+                            "/usuario/change-password"
+                    );
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(policyUpdated);
                 }
                 default:
                     return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new UnsuccessfulResponse("401", "Credenciales incorrectas", "/usuario/login"));
@@ -498,6 +537,82 @@ public class UsuarioAPI {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Email test failed: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/test-security-bl")
+    public ResponseEntity<?> testSecurityBL() {
+        try {
+            System.out.println("🧪 === SECURITY BL TEST ===");
+            System.out.println("🧪 securityBL is null? " + (securityBL == null));
+            
+            if (securityBL == null) {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body("ERROR: SecurityBL is null - dependency injection failed!");
+            }
+            
+            return ResponseEntity.ok().body("SUCCESS: SecurityBL is properly injected!");
+            
+        } catch (Exception e) {
+            System.err.println("🧪 Error testing SecurityBL: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Exception testing SecurityBL: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/force-policy-enforcement")
+    public ResponseEntity<?> forcePolicyEnforcement() {
+        try {
+            System.out.println("🧪 === MANUAL POLICY ENFORCEMENT TEST ===");
+            
+            if (securityBL == null) {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body("ERROR: SecurityBL is null!");
+            }
+            
+            securityBL.enforcePasswordPolicyUpdateForAllUsers();
+            return ResponseEntity.ok().body("Policy enforcement completed. Check logs for details.");
+            
+        } catch (Exception e) {
+            System.err.println("🧪 Error in manual policy enforcement: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error in policy enforcement: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/check-password-change-flags")
+    public ResponseEntity<?> checkPasswordChangeFlags() {
+        try {
+            System.out.println("🧪 === CHECKING PASSWORD CHANGE FLAGS ===");
+            
+            Iterable<Usuario> allUsers = usuarioService.findAll();
+            Map<String, Object> result = new HashMap<>();
+            int totalUsers = 0;
+            int markedForChange = 0;
+            
+            for (Usuario user : allUsers) {
+                totalUsers++;
+                if (user.getCambioContrasenia() != null && user.getCambioContrasenia()) {
+                    markedForChange++;
+                    System.out.println("🚩 User marked for password change: " + user.getCorreo() + " (ID: " + user.getIdUsuario() + ")");
+                } else {
+                    System.out.println("✅ User NOT marked for password change: " + user.getCorreo() + " (ID: " + user.getIdUsuario() + ")");
+                }
+            }
+            
+            result.put("totalUsers", totalUsers);
+            result.put("markedForChange", markedForChange);
+            result.put("message", markedForChange + " out of " + totalUsers + " users are marked for password change");
+            
+            return ResponseEntity.ok(result);
+            
+        } catch (Exception e) {
+            System.err.println("🧪 Error checking password change flags: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error checking flags: " + e.getMessage());
         }
     }
 }

@@ -155,11 +155,21 @@ public class ConfiguracionSeguridadAPI {
     public ResponseEntity<?> updateConfiguration(@RequestBody ConfiguracionSeguridad newConfig,
                                                 @RequestParam Long userId) {
         try {
+            System.out.println("🔧 === CONFIGURATION UPDATE REQUEST ===");
+            System.out.println("🔧 userId: " + userId);
+            System.out.println("🔧 New config - Min Length: " + newConfig.getMinLongitudContrasenia());
+            System.out.println("🔧 New config - Max Attempts: " + newConfig.getMaxIntentosLogin());
+            System.out.println("🔧 New config - Require Upper: " + newConfig.isRequerirMayusculas());
+            System.out.println("🔧 New config - Require Lower: " + newConfig.isRequerirMinusculas());
+            System.out.println("🔧 New config - Require Numbers: " + newConfig.isRequerirNumeros());
+            System.out.println("🔧 New config - Require Symbols: " + newConfig.isRequerirSimbolos());
+            
             // TODO: Add authorization check - only 'Seguridad' role should access this
             // You can implement this using @PreAuthorize("hasRole('Seguridad')") or manual check
             
             // Validate configuration values
             if (!isValidConfiguration(newConfig)) {
+                System.err.println("❌ Configuration validation failed");
                 UnsuccessfulResponse response = new UnsuccessfulResponse(
                     "400 Bad Request",
                     "Configuración inválida. Verifique los valores ingresados.",
@@ -168,7 +178,10 @@ public class ConfiguracionSeguridadAPI {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
             }
 
+            System.out.println("🔧 Calling configuracionService.updateConfiguration...");
             ConfiguracionSeguridad updatedConfig = configuracionService.updateConfiguration(newConfig, userId);
+            System.out.println("🔧 Configuration updated successfully!");
+            System.out.println("🔧 Updated config ID: " + updatedConfig.getIdConfig());
             
             Map<String, Object> data = new HashMap<>();
             data.put("configuracion", updatedConfig);
@@ -183,6 +196,8 @@ public class ConfiguracionSeguridadAPI {
             return ResponseEntity.ok(response);
             
         } catch (Exception e) {
+            System.err.println("❌ Error updating configuration: " + e.getMessage());
+            e.printStackTrace();
             // Still return success but indicate database issue
             Map<String, Object> data = new HashMap<>();
             data.put("configuracion", newConfig);

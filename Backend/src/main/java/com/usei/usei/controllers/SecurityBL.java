@@ -54,14 +54,34 @@ public class SecurityBL {
             return (rest == 0) ? LoginStatus.BLOQUEADO : LoginStatus.CREDENCIALES;
         }
 
+        // Password is correct, reset attempts
         c.setIntentosRestantes(passwordPolicyUtil.getMaxIntentos());
         c.setUltimoLog(LocalDate.now());
         contraseniaDAO.save(c);
 
+        // Check if password has expired
         LocalDate fc = c.getFechaCreacion();
         if (fc != null && LocalDate.now().isAfter(fc.plusDays(passwordPolicyUtil.getExpiraDias()))) {
+            System.out.println("🔒 Password expired for user: " + correo);
             return LoginStatus.EXPIRADA;
         }
+
+        // NEW: Check if existing password complies with current security policies
+        System.out.println("🔒 === CHECKING POLICY COMPLIANCE FOR USER: " + correo + " ===");
+        boolean complies = passwordPolicyUtil.existingPasswordCompliesWithCurrentPolicy(c);
+        System.out.println("🔒 Policy compliance result: " + complies);
+        
+        if (!complies) {
+            System.out.println("🔒 Password does not comply with current policies - forcing password change");
+            System.out.println("🔒 User: " + correo + " (ID: " + u.getIdUsuario() + ")");
+            // Mark user for mandatory password change
+            u.setCambioContrasenia(true);
+            usuarioService.save(u);
+            System.out.println("🔒 User marked for password change, returning POLITICA_ACTUALIZADA");
+            return LoginStatus.POLITICA_ACTUALIZADA;
+        }
+
+        System.out.println("✅ Login successful for user: " + correo);
         return LoginStatus.OK;
     }
 
@@ -107,8 +127,8 @@ public class SecurityBL {
         actual.setContrasenia(nuevoHash);
         actual.setFechaCreacion(LocalDate.now());
         actual.setUltimoLog(LocalDate.now());
-        actual.setLongitud(passwordPolicyUtil.getMinLength());
-        actual.setComplejidad(passwordPolicyUtil.getComplejidad());
+        actual.setLongitud(nuevaPlano.length()); // Set actual length of new password
+        actual.setComplejidad(passwordPolicyUtil.calcularComplejidad(nuevaPlano)); // Calculate actual complexity
         actual.setIntentosRestantes(passwordPolicyUtil.getMaxIntentos());
         contraseniaDAO.save(actual);
 
@@ -157,5 +177,29 @@ public class SecurityBL {
         estudiante.setIntentosRestantes(passwordPolicyUtil.getMaxIntentos());
         // Note: Estudiante will be saved by the calling service
         return LoginStatus.OK;
+    }
+
+    /**
+     * Mark all users for mandatory password change when security policies are updated.
+     * This method should be called whenever security policies are modified by the Security role.
+     */
+    @Transactional
+    public void enforcePasswordPolicyUpdateForAllUsers() {
+        System.out.println("🔒 Enforcing password policy update for all users...");
+        
+        // Get all users and mark them for password change
+        Iterable<Usuario> allUsers = usuarioService.findAll();
+        int updatedCount = 0;
+        
+        for (Usuario user : allUsers) {
+            // Only mark users who currently have a password
+            if (user.getContraseniaEntity() != null) {
+                user.setCambioContrasenia(true);
+                usuarioService.save(user);
+                updatedCount++;
+            }
+        }
+        
+        System.out.println("🔒 Marked " + updatedCount + " users for mandatory password change due to policy update.");
     }
 }

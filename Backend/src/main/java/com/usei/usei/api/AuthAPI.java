@@ -69,6 +69,7 @@ public class AuthAPI {
                 String message = (String) authResult.get("message");
                 Boolean expired = (Boolean) authResult.getOrDefault("expired", false);
                 Boolean bloqueado = (Boolean) authResult.getOrDefault("bloqueado", false);
+                Boolean politicaActualizada = (Boolean) authResult.getOrDefault("politicaActualizada", false);
                 
                 HttpStatus status;
                 String statusCode;
@@ -79,6 +80,10 @@ public class AuthAPI {
                 } else if (expired) {
                     status = HttpStatus.FORBIDDEN;
                     statusCode = "403 Forbidden";
+                } else if (politicaActualizada) {
+                    status = HttpStatus.UPGRADE_REQUIRED;
+                    statusCode = "426 Upgrade Required";
+                    System.out.println("🔒 Returning POLITICA_ACTUALIZADA response to frontend");
                 } else {
                     status = HttpStatus.UNAUTHORIZED;
                     statusCode = "401 Unauthorized";
@@ -89,6 +94,18 @@ public class AuthAPI {
                     message,
                     "/auth/login"
                 );
+                
+                // Add extra data for policy update case by creating a Map response
+                if (politicaActualizada) {
+                    Map<String, Object> policyResponse = new HashMap<>();
+                    policyResponse.put("timeStamp", response.getTimeStamp());
+                    policyResponse.put("status", statusCode);
+                    policyResponse.put("error", message);
+                    policyResponse.put("path", "/auth/login");
+                    policyResponse.put("politicaActualizada", true);
+                    policyResponse.put("idUsuario", authResult.get("idUsuario"));
+                    return ResponseEntity.status(status).body(policyResponse);
+                }
                 
                 return ResponseEntity.status(status).body(response);
             }

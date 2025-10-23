@@ -5,6 +5,7 @@ import com.usei.usei.repositories.ConfiguracionSeguridadDAO;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,7 +17,6 @@ public class ConfiguracionSeguridadBL implements ConfiguracionSeguridadService {
 
     private final ConfiguracionSeguridadDAO configuracionDAO;
 
-    @Autowired
     public ConfiguracionSeguridadBL(ConfiguracionSeguridadDAO configuracionDAO) {
         this.configuracionDAO = configuracionDAO;
     }
@@ -44,7 +44,13 @@ public class ConfiguracionSeguridadBL implements ConfiguracionSeguridadService {
         newConfig.setUsuarioModificacion(userId);
         newConfig.setActiva(true);
 
-        return configuracionDAO.save(newConfig);
+        ConfiguracionSeguridad saved = configuracionDAO.save(newConfig);
+
+        System.out.println("✅ Security configuration updated successfully!");
+        System.out.println("✅ New configuration ID: " + saved.getIdConfig());
+        System.out.println("✅ Users will be forced to update passwords on next login based on new policies.");
+
+        return saved;
     }
 
     @Override
