@@ -3,6 +3,7 @@ package com.usei.usei.dto.request;
 public class UnifiedLoginRequest {
     private String correo;
     private String contrasena;
+    private String captchaToken;
 
     public UnifiedLoginRequest() {
     }
@@ -26,5 +27,12 @@ public class UnifiedLoginRequest {
 
     public void setContrasena(String contrasena) {
         this.contrasena = contrasena;
+    }
+    public String getCaptchaToken() {
+        return captchaToken;
+    }
+
+    public void setCaptchaToken(String captchaToken) {
+        this.captchaToken = captchaToken;
     }
 }

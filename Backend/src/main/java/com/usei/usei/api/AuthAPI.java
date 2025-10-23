@@ -4,9 +4,8 @@ import com.usei.usei.controllers.AuthenticationService;
 import com.usei.usei.dto.request.UnifiedLoginRequest;
 import com.usei.usei.dto.response.LoginResponseDTO;
 import com.usei.usei.dto.UnsuccessfulResponse;
-import com.usei.usei.models.Estudiante;
-import com.usei.usei.models.Usuario;
 import com.usei.usei.util.TokenGenerator;
+import com.usei.usei.services.CaptchaService; 
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -24,9 +23,12 @@ public class AuthAPI {
 
     @Autowired
     private AuthenticationService authService;
-    
+
     @Autowired
     private TokenGenerator tokenGenerator;
+
+    @Autowired
+    private CaptchaService captchaService; // ✅ NUEVO
 
     /**
      * Endpoint unificado de login para Usuario y Estudiante
@@ -35,7 +37,30 @@ public class AuthAPI {
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody UnifiedLoginRequest request) {
         try {
-            // Validar que vengan los datos requeridos
+            // ✅ 1. Verificar que venga el captcha desde el frontend
+            if (request.getCaptchaToken() == null || request.getCaptchaToken().isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+                    new UnsuccessfulResponse(
+                        "400 Bad Request",
+                        "El token de reCAPTCHA es obligatorio",
+                        "/auth/login"
+                    )
+                );
+            }
+
+            // ✅ 2. Validar el captcha con Google
+            boolean captchaValido = captchaService.verifyCaptcha(request.getCaptchaToken());
+            if (!captchaValido) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
+                    new UnsuccessfulResponse(
+                        "403 Forbidden",
+                        "Verificación de reCAPTCHA fallida. Por favor, inténtelo de nuevo.",
+                        "/auth/login"
+                    )
+                );
+            }
+
+            // ✅ 3. Validar datos del usuario
             if (request.getCorreo() == null || request.getCorreo().trim().isEmpty()) {
                 return ResponseEntity.badRequest().body(
                     new UnsuccessfulResponse(
@@ -45,7 +70,7 @@ public class AuthAPI {
                     )
                 );
             }
-            
+
             if (request.getContrasena() == null || request.getContrasena().isEmpty()) {
                 return ResponseEntity.badRequest().body(
                     new UnsuccessfulResponse(
@@ -55,24 +80,23 @@ public class AuthAPI {
                     )
                 );
             }
-            
-            // Intentar autenticar
+
+            // ✅ 4. Intentar autenticar
             Map<String, Object> authResult = authService.authenticate(
-                request.getCorreo().trim(), 
+                request.getCorreo().trim(),
                 request.getContrasena()
             );
-            
+
             Boolean success = (Boolean) authResult.get("success");
-            
-            // Si falla la autenticación
+
             if (!success) {
                 String message = (String) authResult.get("message");
                 Boolean expired = (Boolean) authResult.getOrDefault("expired", false);
                 Boolean bloqueado = (Boolean) authResult.getOrDefault("bloqueado", false);
-                
+
                 HttpStatus status;
                 String statusCode;
-                
+
                 if (bloqueado) {
                     status = HttpStatus.LOCKED;
                     statusCode = "423 Locked";
@@ -83,28 +107,26 @@ public class AuthAPI {
                     status = HttpStatus.UNAUTHORIZED;
                     statusCode = "401 Unauthorized";
                 }
-                
+
                 UnsuccessfulResponse response = new UnsuccessfulResponse(
                     statusCode,
                     message,
                     "/auth/login"
                 );
-                
+
                 return ResponseEntity.status(status).body(response);
             }
-            
-            
-            // Login exitoso
-           String tipo = (String) authResult.get("tipo");
+
+            // ✅ 5. Login exitoso
+            String tipo = (String) authResult.get("tipo");
             @SuppressWarnings("unchecked")
-            Map<String, Object> data = (Map<String, Object>) authResult.get("data"); // ✅ ahora data es un Map
+            Map<String, Object> data = (Map<String, Object>) authResult.get("data");
             @SuppressWarnings("unchecked")
             List<String> accesos = (List<String>) authResult.get("accesos");
 
             String token = "";
 
             if ("usuario".equals(tipo)) {
-                // ya no hacemos cast a Usuario
                 String idUsuario = String.valueOf(data.get("id_usuario"));
                 String correoUsuario = (String) data.get("correo");
 
@@ -127,7 +149,6 @@ public class AuthAPI {
                 );
             }
 
-            //Agregar accesos dentro de data 
             if (!data.containsKey("accesos") && accesos != null) {
                 data.put("accesos", accesos);
             }
@@ -143,7 +164,6 @@ public class AuthAPI {
 
             return ResponseEntity.ok(response);
 
-            
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
