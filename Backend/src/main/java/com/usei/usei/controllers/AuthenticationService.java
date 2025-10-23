@@ -132,6 +132,13 @@ public class AuthenticationService {
             result.put("idUsuario", usuario.getIdUsuario());
             System.out.println("🔒 Returning politicaActualizada response");
             return result;
+        } else {
+            // 🔒 Password is compliant - ensure cambioContrasenia flag is cleared
+            if (usuario.getCambioContrasenia() != null && usuario.getCambioContrasenia()) {
+                System.out.println("🔒 Password is compliant - clearing cambioContrasenia flag");
+                usuario.setCambioContrasenia(false);
+                usuarioDAO.save(usuario);
+            }
         }
 
         // ======================================================

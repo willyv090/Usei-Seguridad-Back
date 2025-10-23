@@ -197,31 +197,21 @@ public class PasswordPolicyUtil {
             // Convert password creation date to start of day for comparison
             java.time.LocalDateTime passwordCreatedDateTime = passwordCreated.atStartOfDay();
             
-            // Check if password was created recently (today or within last hour of policy modification)
-            java.time.LocalDate today = java.time.LocalDate.now();
-            boolean passwordCreatedToday = passwordCreated.equals(today);
+            // Get policy modification date (without time) for comparison
+            java.time.LocalDate policyModifiedDate = policyModified.toLocalDate();
             
-            // Also check if password was created within 1 hour after policy modification
-            // This handles cases where password is updated immediately after policy change
-            java.time.LocalDateTime oneHourAfterPolicy = policyModified.plusHours(1);
-            boolean passwordCreatedWithinBuffer = passwordCreatedDateTime.isAfter(policyModified) && 
-                                                 passwordCreatedDateTime.isBefore(oneHourAfterPolicy);
+            System.out.println("🔒 Password created date: " + passwordCreated);
+            System.out.println("🔒 Policy modified date: " + policyModifiedDate);
             
-            System.out.println("🔒 Password created today? " + passwordCreatedToday);
-            System.out.println("🔒 Password created within buffer after policy? " + passwordCreatedWithinBuffer);
-            
-            if (passwordCreatedToday || passwordCreatedWithinBuffer) {
-                System.out.println("✅ Password was created/updated recently - considering it compliant with current policies");
+            // Only enforce policy if password was created BEFORE the day the policy was modified
+            // This ensures that passwords created on or after the policy modification date are considered compliant
+            if (passwordCreated.isBefore(policyModifiedDate)) {
+                System.out.println("❌ POLICY ENFORCEMENT: Password created BEFORE policy update date!");
+                System.out.println("❌ Password date: " + passwordCreated + ", Policy modified date: " + policyModifiedDate);
+                System.out.println("❌ FORCING PASSWORD CHANGE - Security policies have been updated");
+                return false;
             } else {
-                // If password was created before the policy was last modified, force update
-                if (passwordCreatedDateTime.isBefore(policyModified)) {
-                    System.out.println("❌ POLICY ENFORCEMENT: Password created BEFORE policy update!");
-                    System.out.println("❌ Password date: " + passwordCreatedDateTime + ", Policy modified: " + policyModified);
-                    System.out.println("❌ FORCING PASSWORD CHANGE - Security policies have been updated");
-                    return false;
-                } else {
-                    System.out.println("✅ Password created AFTER policy update - checking compliance...");
-                }
+                System.out.println("✅ Password created ON OR AFTER policy update date - checking current compliance...");
             }
         }
         

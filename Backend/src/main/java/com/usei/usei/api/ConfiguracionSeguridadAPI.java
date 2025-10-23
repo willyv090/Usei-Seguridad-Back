@@ -183,6 +183,10 @@ public class ConfiguracionSeguridadAPI {
             System.out.println("🔧 Configuration updated successfully!");
             System.out.println("🔧 Updated config ID: " + updatedConfig.getIdConfig());
             
+            // 🔒 POLICY ENFORCEMENT: Only trigger during login, not immediately
+            // The policy compliance will be checked during authentication in AuthenticationService
+            System.out.println("🔒 Policy updated - enforcement will be checked during next login for each user");
+            
             Map<String, Object> data = new HashMap<>();
             data.put("configuracion", updatedConfig);
             
