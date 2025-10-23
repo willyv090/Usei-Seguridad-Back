@@ -163,74 +163,47 @@ private EstadoEncuestaService estadoEncuestaService;
     }
 
     // Inicio de sesión de estudiante
-    @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequestDTO loginRequest) {
-        try{
-            // Use unified LoginStatus approach for consistency with Usuario login
-            LoginStatus status = estudianteService.loginWithStatus(loginRequest.getCi(), loginRequest.getContrasena());
-            
-            switch (status) {
-                case OK: {
-                    // Successful login - get student data
-                    Optional<Estudiante> estudianteOpt = estudianteService.findByCi(loginRequest.getCi());
-                    if (estudianteOpt.isPresent()) {
-                        Estudiante estudiante = estudianteOpt.get();
-                        estudiante.setContrasena(null); // Don't send password in response
-                        
-                        String token = tokenGenerator.generateToken(
-                            String.valueOf(estudiante.getIdEstudiante()), 
-                            "estudiante", 
-                            estudiante.getCorreoInstitucional(), 
-                            60
-                        );
+    // ❌ COMENTAR O ELIMINAR ESTE MÉTODO - Ahora se usa /auth/login
+/*
+@PostMapping("/login")
+public ResponseEntity<?> login(@RequestBody LoginRequestDTO loginRequest) {
+    try{
+        Optional<Estudiante> estudiante = estudianteService.login(loginRequest.getCi(), loginRequest.getContrasena());
+        if (estudiante.isPresent()) {
+            estudiante.get().setContrasena(null);
+            Estudiante foundEstudiante = estudiante.get();
+            String token = tokenGenerator.generateToken(String.valueOf(estudiante.get().getIdEstudiante()), "estudiante", estudiante.get().getCorreoInstitucional(), 60);
 
-                        // Create response data
-                        Map<String, Object> data = new HashMap<>();
-                        data.put("id_estudiante", estudiante.getIdEstudiante());
-                        data.put("rol", "estudiante");
-                        data.put("ci", estudiante.getCi());
-                        data.put("correoInstitucional", estudiante.getCorreoInstitucional());
-                        data.put("nombre", estudiante.getNombre());
-                        data.put("apellido", estudiante.getApellido());
-                        data.put("telefono", estudiante.getTelefono());
+            Map<String, Object> data = new HashMap<>();
+            data.put("id_estudiante", foundEstudiante.getIdEstudiante());
+            data.put("rol", "estudiante");
+            data.put("ci", estudiante.get().getCi());
+            data.put("correoInstitucional", estudiante.get().getCorreoInstitucional());
+            data.put("nombre", estudiante.get().getNombre());
+            data.put("apellido", estudiante.get().getApellido());
+            data.put("telefono", estudiante.get().getTelefono());
 
-                        SuccessfulResponse response = new SuccessfulResponse(
-                                "200 OK",
-                                "Inicio de sesión correcto",
-                                token,
-                                60,
-                                data
-                        );
-                        return ResponseEntity.ok(response);
-                    }
-                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Estudiante no encontrado tras validación");
-                }
-                case BLOQUEADO: {
-                    UnsuccessfulResponse blocked = new UnsuccessfulResponse(
-                            "403 Forbidden",
-                            "Cuenta bloqueada por intentos fallidos. Use recuperación de contraseña.",
-                            "/estudiante/recover"
-                    );
-                    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(blocked);
-                }
-                case CREDENCIALES: {
-                    // Get remaining attempts for user feedback
-                    Optional<Estudiante> existing = estudianteService.findByCi(loginRequest.getCi());
-                    int remaining = existing.isPresent() ? existing.get().getIntentosRestantes() : 0;
-                    
-                    Map<String,Object> payload = new HashMap<>();
-                    payload.put("status","401 Unauthorized");
-                    payload.put("message","Credenciales incorrectas");
-                    payload.put("remainingAttempts", remaining);
-                    return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(payload);
-                }
-                default:
-                    return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new UnsuccessfulResponse("401", "Credenciales incorrectas", "/estudiante/login"));
-            }
-        } catch (Exception e) {
-            return new ResponseEntity<>(new LoginResponse<Object>(e.getMessage()), HttpStatus.INTERNAL_SERVER_ERROR);
+            SuccessfulResponse response = new SuccessfulResponse(
+                    "200 OK",
+                    "Inicio de sesión correcto",
+                    token,
+                    60,
+                    data
+            );
+            return ResponseEntity.ok(response);
+        } else {
+            UnsuccessfulResponse response = new UnsuccessfulResponse(
+                "401 Unauthorized",
+                "Credenciales incorrectas",
+                "/estudiante/login"
+            );
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
         }
+    } catch (Exception e) {
+        return new ResponseEntity<>(new LoginResponse(e.getMessage()), HttpStatus.INTERNAL_SERVER_ERROR);
     }
+}
+*/
 
     @PostMapping("/enviarEnlace")
     public ResponseEntity<?> enviarEnlaceCertificado() {

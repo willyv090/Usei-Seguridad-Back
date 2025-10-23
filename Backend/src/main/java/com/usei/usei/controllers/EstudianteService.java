@@ -1,11 +1,14 @@
 package com.usei.usei.controllers;
 
-import com.usei.usei.models.Estudiante;
-import jakarta.mail.MessagingException;
 import java.util.List;
 import java.util.Optional;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+
+import com.usei.usei.models.Estudiante;
+
+import jakarta.mail.MessagingException;
 
 public interface EstudianteService {
 
@@ -19,14 +22,9 @@ public interface EstudianteService {
 
     public Estudiante update (Estudiante newEstudiante, Long id);
 
-    public Optional<Estudiante> login(int ci, String contrasena);
-    
-    // New unified login method that returns LoginStatus for consistency with Usuario login
-    public LoginStatus loginWithStatus(int ci, String contrasena);
-    
-    Optional<Estudiante> findByCi(int ci);
+    // ❌ ELIMINAR O COMENTAR ESTE MÉTODO
+    // public Optional<Estudiante> login(int ci, String contrasena);
 
-    // Método para enviar el correo
     public void enviarCorreosEstudiantes() throws MessagingException;
 
     public void enviarCodigoVerificacion(String correo) throws MessagingException;
@@ -39,16 +37,13 @@ public interface EstudianteService {
 
     Page<Estudiante> findByNombreContainingOrCiContaining(String nombre, String ci, Pageable pageable);
 
-    // Nuevos métodos separados para buscar por nombre y CI
-    Page<Estudiante> findByNombre(String nombre, Pageable pageable); // Búsqueda por nombre
+    Page<Estudiante> findByNombre(String nombre, Pageable pageable);
 
-    Page<Estudiante> findByCi(Integer ci, Pageable pageable); // Búsqueda por CI
+    Page<Estudiante> findByCi(Integer ci, Pageable pageable);
 
-    Page<Estudiante> findAll(Pageable pageable); // Obtener todos los estudiantes con paginación
+    Page<Estudiante> findAll(Pageable pageable);
 
     Optional<Estudiante> existingStudent(int ci);
-
-    //List<Estudiante> findEstudiantesNoCompletaronEncuesta();
 
     List<Integer> findDistinctAnios();
     List<Integer> findDistinctSemestres();
@@ -57,6 +52,4 @@ public interface EstudianteService {
 
     public List<Integer> findUniqueYears();
     List<Estudiante> findByCarrera(String carrera);
-
-
 }
