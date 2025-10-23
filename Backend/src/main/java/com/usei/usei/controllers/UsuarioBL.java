@@ -1,10 +1,13 @@
 package com.usei.usei.controllers;
 
+import java.io.File;
 import java.time.LocalDate;
 import java.util.Optional;
 import java.security.SecureRandom;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -256,40 +259,73 @@ public class UsuarioBL implements UsuarioService {
         return usuarioDAO.save(user);
     }
 
-    /* ==========================
-       ENVÍO DE CREDENCIALES MANUAL
-       ========================== */
+    /* ENVÍO DE CREDENCIALES */
     @Override
     public void enviarCredencialesUsuario(Usuario usuario) {
         try {
             if (usuario == null) throw new RuntimeException("Usuario no válido.");
 
+            // Generar contraseña inicial
             String contraseniaGenerada = buildInitialPassword(
                     nullSafe(usuario.getNombre()),
                     nullSafe(usuario.getApellido()),
                     nullSafe(usuario.getCi())
             );
 
-            String cuerpo = """
-            Estimado/a %s %s,
-            
-            Sus credenciales de acceso al Sistema USEI son:
-            
-            Usuario: %s
-            Contraseña: %s
-            
-            Por seguridad, deberá cambiar su contraseña al ingresar por primera vez.
-            
-            Saludos cordiales,
-            Equipo USEI
-            Universidad Católica Boliviana "San Pablo"
-            """.formatted(usuario.getNombre(), usuario.getApellido(), usuario.getCi(), contraseniaGenerada);
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
-            enviarCorreo(usuario.getCorreo(), "Reenvío de credenciales - Sistema USEI", cuerpo);
+            helper.setTo(usuario.getCorreo());
+            helper.setSubject("Credenciales de acceso - Sistema Encuesta a Tiempo de Graduación - USEI");
+
+            // ✅ Usar logo por URL pública
+            String logoUrl = "https://lpz.ucb.edu.bo/wp-content/uploads/2021/09/USEI.png";
+
+            // ✅ Contenido HTML
+            String contenido = """
+        <html>
+        <body style="font-family: Arial, sans-serif; background-color:#f4f6f7; padding:20px; color:#333;">
+            <div style="max-width:600px; margin:auto; background:#fff; border-radius:10px; padding:25px; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+                <div style="text-align:center; margin-bottom:20px;">
+                    <img src='%s' alt='Logo USEI' style="width:120px;"/>
+                </div>
+
+                <p>Estimado/a <strong>%s %s</strong>,</p>
+
+                <p>Reciba un cordial saludo. A través de este mensaje le hacemos llegar sus credenciales de acceso al <strong>Sistema USEI</strong>:</p>
+
+                <div style="background:#eef8f5; border-left:4px solid #63C7B2; padding:12px 18px; margin:20px 0; font-size:15px;">
+                    <p><strong>Usuario (correo):</strong> %s</p>
+                    <p><strong>Contraseña inicial:</strong> %s</p>
+                </div>
+
+                <p>Por motivos de seguridad, se le solicita cambiar su contraseña al ingresar por primera vez al sistema.</p>
+
+                <p style="margin-top:25px;">Atentamente,</p>
+                <p><strong>Equipo USEI<br>
+                Universidad Católica Boliviana “San Pablo”</strong></p>
+
+                <hr style="border:none; border-top:1px solid #ddd; margin:25px 0;">
+                <p style="font-size:12px; color:#777;">Este mensaje fue generado automáticamente. Por favor, no responda a este correo.</p>
+            </div>
+        </body>
+        </html>
+        """.formatted(
+                    logoUrl,
+                    usuario.getNombre(),
+                    usuario.getApellido(),
+                    usuario.getCorreo(),
+                    contraseniaGenerada
+            );
+
+            helper.setText(contenido, true);
+            mailSender.send(message);
+
         } catch (Exception e) {
             throw new RuntimeException("Error al enviar credenciales: " + e.getMessage());
         }
     }
+
 
     @Override
     public boolean existsByCi(String ci) { return usuarioDAO.existsByCi(ci); }
