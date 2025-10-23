@@ -266,9 +266,6 @@ public class UsuarioAPI {
         }
     }
 
-
-
-
     // ===========================
     // CAMBIAR CONTRASEÑA (con hash + políticas + historial)
     // ===========================
