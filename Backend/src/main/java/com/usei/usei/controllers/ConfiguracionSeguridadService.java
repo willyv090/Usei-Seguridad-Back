@@ -33,4 +33,19 @@ public interface ConfiguracionSeguridadService {
      * Check if there's an active configuration
      */
     boolean hasActiveConfiguration();
+
+    /**
+     * Get configuration by ID (for backward compatibility)
+     */
+    ConfiguracionSeguridad obtenerConfiguracionPorId(Long id);
+
+    /**
+     * Get the active configuration (for backward compatibility)
+     */
+    ConfiguracionSeguridad obtenerConfiguracionActiva();
+
+    /**
+     * Delete configuration by ID
+     */
+    void eliminarConfiguracion(Long id);
 }

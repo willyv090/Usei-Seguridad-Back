@@ -283,4 +283,57 @@ public class ConfiguracionSeguridadAPI {
         
         return true;
     }
+
+    /**
+     * Delete a security configuration by ID
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteConfiguracion(@PathVariable Long id) {
+        try {
+            // Check if configuration exists
+            ConfiguracionSeguridad existingConfig = configuracionService.obtenerConfiguracionPorId(id);
+            if (existingConfig == null) {
+                UnsuccessfulResponse response = new UnsuccessfulResponse(
+                    "404 Not Found",
+                    "Configuración no encontrada con ID: " + id,
+                    "/configuracion-seguridad/" + id
+                );
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+            }
+
+            // Check if this is the active configuration
+            ConfiguracionSeguridad activeConfig = configuracionService.obtenerConfiguracionActiva();
+            if (activeConfig != null && activeConfig.getIdConfig().equals(id)) {
+                UnsuccessfulResponse response = new UnsuccessfulResponse(
+                    "409 Conflict",
+                    "No se puede eliminar la configuración activa",
+                    "/configuracion-seguridad/" + id
+                );
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+            }
+
+            // Delete the configuration
+            configuracionService.eliminarConfiguracion(id);
+
+            // Create success response with proper constructor
+            Map<String, Object> data = new HashMap<>();
+            data.put("deletedId", id);
+            SuccessfulResponse response = new SuccessfulResponse(
+                "200 OK",
+                "Configuración eliminada exitosamente",
+                null,
+                0,
+                data
+            );
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            UnsuccessfulResponse response = new UnsuccessfulResponse(
+                "500 Internal Server Error",
+                "Error al eliminar configuración: " + e.getMessage(),
+                "/configuracion-seguridad/" + id
+            );
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
 }

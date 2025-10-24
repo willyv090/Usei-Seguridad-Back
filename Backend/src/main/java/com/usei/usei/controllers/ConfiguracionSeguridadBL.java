@@ -98,4 +98,24 @@ public class ConfiguracionSeguridadBL implements ConfiguracionSeguridadService {
 
         return configuracionDAO.save(defaultConfig);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ConfiguracionSeguridad obtenerConfiguracionPorId(Long id) {
+        Optional<ConfiguracionSeguridad> config = configuracionDAO.findById(id);
+        return config.orElse(null);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ConfiguracionSeguridad obtenerConfiguracionActiva() {
+        Optional<ConfiguracionSeguridad> config = configuracionDAO.findActiveConfiguration();
+        return config.orElse(null);
+    }
+
+    @Override
+    @Transactional
+    public void eliminarConfiguracion(Long id) {
+        configuracionDAO.deleteById(id);
+    }
 }
