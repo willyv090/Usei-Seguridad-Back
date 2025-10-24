@@ -29,6 +29,9 @@ public class AuthenticationService {
     @Autowired
     private RolDAO rolDAO;
 
+    @Autowired
+    private com.usei.usei.util.PasswordPolicyUtil passwordPolicyUtil;
+
     /**
      * Método principal de autenticación que maneja tanto Usuario como Estudiante
      */
@@ -109,6 +112,27 @@ public class AuthenticationService {
         contrasenia.setIntentosRestantes(3);
         contrasenia.setUltimoLog(LocalDate.now());
         contraseniaDAO.save(contrasenia);
+
+        // 🔒 NEW: Check if password complies with current security policies
+        System.out.println("🔒 === CHECKING POLICY COMPLIANCE IN AUTH SERVICE ===");
+        boolean complies = passwordPolicyUtil.existingPasswordCompliesWithCurrentPolicy(contrasenia);
+        System.out.println("🔒 Policy compliance result: " + complies);
+        
+        if (!complies) {
+            System.out.println("🔒 Password does not comply with current policies - forcing password change");
+            System.out.println("🔒 User: " + usuario.getCorreo() + " (ID: " + usuario.getIdUsuario() + ")");
+            
+            // Mark user for mandatory password change
+            usuario.setCambioContrasenia(true);
+            usuarioDAO.save(usuario);
+            
+            result.put("success", false);
+            result.put("message", "Las políticas de seguridad han sido actualizadas. Debe cambiar su contraseña.");
+            result.put("politicaActualizada", true);
+            result.put("idUsuario", usuario.getIdUsuario());
+            System.out.println("🔒 Returning politicaActualizada response");
+            return result;
+        }
 
         // ======================================================
         // 🔹 OBTENER ACCESOS DESDE EL ROL Y GUARDAR EN DATA

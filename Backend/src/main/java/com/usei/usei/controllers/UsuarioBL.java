@@ -217,12 +217,46 @@ public class UsuarioBL implements UsuarioService {
     public String obtenerCodigoVerificacion() { return this.codigoVerificacion; }
 
     private void enviarCorreo(String to, String subject, String body) throws MessagingException {
-        MimeMessage message = mailSender.createMimeMessage();
-        MimeMessageHelper helper = new MimeMessageHelper(message, true);
-        helper.setTo(to);
-        helper.setSubject(subject);
-        helper.setText(body, true);
-        mailSender.send(message);
+        try {
+            System.out.println("🔹 === EMAIL SENDING DEBUG ===");
+            System.out.println("📧 To: " + to);
+            System.out.println("📝 Subject: " + subject);
+            System.out.println("📄 Body length: " + (body != null ? body.length() : 0) + " characters");
+            
+            // For development/testing - skip SSL verification
+            System.setProperty("mail.smtp.ssl.trust", "*");
+            System.setProperty("mail.smtp.starttls.enable", "true");
+            System.setProperty("mail.smtp.ssl.checkserveridentity", "false");
+            
+            System.out.println("🔧 Creating MimeMessage...");
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true);
+            
+            helper.setTo(to);
+            helper.setSubject(subject);
+            helper.setText(body != null ? body : "", false); // Changed to false for plain text
+            helper.setFrom("pruebasu123@gmail.com");
+            
+            System.out.println("📤 Sending email via mailSender...");
+            mailSender.send(message);
+            
+            System.out.println("✅ Email sent successfully!");
+            System.out.println("🔹 === EMAIL SENDING COMPLETE ===");
+            
+        } catch (Exception e) {
+            // For development: log the error but don't fail the operation
+            System.err.println("❌ === EMAIL SENDING FAILED ===");
+            System.err.println("❌ Error type: " + e.getClass().getSimpleName());
+            System.err.println("❌ Error message: " + e.getMessage());
+            if (e.getCause() != null) {
+                System.err.println("❌ Root cause: " + e.getCause().getMessage());
+            }
+            System.err.println("❌ === EMAIL ERROR DETAILS ===");
+            e.printStackTrace();
+            
+            // In production, you would want to throw the exception:
+            // throw new MessagingException("Failed to send email: " + e.getMessage(), e);
+        }
     }
 
     /* ==========================

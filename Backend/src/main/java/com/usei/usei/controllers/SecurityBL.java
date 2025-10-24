@@ -5,16 +5,13 @@ import com.usei.usei.models.Usuario;
 import com.usei.usei.repositories.ContraseniaDAO;
 import com.usei.usei.repositories.HContraseniaDAO;
 import com.usei.usei.util.PasswordPolicyUtil;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-
-import static com.usei.usei.util.PasswordPolicyUtil.*;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class SecurityBL {
@@ -23,15 +20,18 @@ public class SecurityBL {
     private final ContraseniaDAO contraseniaDAO;
     private final HContraseniaDAO hContraseniaDAO;
     private final PasswordEncoder bcrypt;
+    private final PasswordPolicyUtil passwordPolicyUtil;
 
     public SecurityBL(UsuarioService usuarioService,
                       ContraseniaDAO contraseniaDAO,
                       HContraseniaDAO hContraseniaDAO,
-                      PasswordEncoder bcrypt) {
+                      PasswordEncoder bcrypt,
+                      PasswordPolicyUtil passwordPolicyUtil) {
         this.usuarioService = usuarioService;
         this.contraseniaDAO = contraseniaDAO;
         this.hContraseniaDAO = hContraseniaDAO;
         this.bcrypt = bcrypt;
+        this.passwordPolicyUtil = passwordPolicyUtil;
     }
 
     @Transactional
@@ -54,20 +54,40 @@ public class SecurityBL {
             return (rest == 0) ? LoginStatus.BLOQUEADO : LoginStatus.CREDENCIALES;
         }
 
-        c.setIntentosRestantes(MAX_INTENTOS);
+        // Password is correct, reset attempts
+        c.setIntentosRestantes(passwordPolicyUtil.getMaxIntentos());
         c.setUltimoLog(LocalDate.now());
         contraseniaDAO.save(c);
 
+        // Check if password has expired
         LocalDate fc = c.getFechaCreacion();
-        if (fc != null && LocalDate.now().isAfter(fc.plusDays(EXPIRA_DIAS))) {
+        if (fc != null && LocalDate.now().isAfter(fc.plusDays(passwordPolicyUtil.getExpiraDias()))) {
+            System.out.println("🔒 Password expired for user: " + correo);
             return LoginStatus.EXPIRADA;
         }
+
+        // NEW: Check if existing password complies with current security policies
+        System.out.println("🔒 === CHECKING POLICY COMPLIANCE FOR USER: " + correo + " ===");
+        boolean complies = passwordPolicyUtil.existingPasswordCompliesWithCurrentPolicy(c);
+        System.out.println("🔒 Policy compliance result: " + complies);
+        
+        if (!complies) {
+            System.out.println("🔒 Password does not comply with current policies - forcing password change");
+            System.out.println("🔒 User: " + correo + " (ID: " + u.getIdUsuario() + ")");
+            // Mark user for mandatory password change
+            u.setCambioContrasenia(true);
+            usuarioService.save(u);
+            System.out.println("🔒 User marked for password change, returning POLITICA_ACTUALIZADA");
+            return LoginStatus.POLITICA_ACTUALIZADA;
+        }
+
+        System.out.println("✅ Login successful for user: " + correo);
         return LoginStatus.OK;
     }
 
     @Transactional
     public PasswordChangeStatus changePassword(Long idUsuario, String nuevaPlano) {
-        if (!PasswordPolicyUtil.cumplePolitica(nuevaPlano)) {
+        if (!passwordPolicyUtil.cumplePolitica(nuevaPlano)) {
             return PasswordChangeStatus.POLITICA_NO_CUMPLIDA;
         }
 
@@ -83,8 +103,8 @@ public class SecurityBL {
             return PasswordChangeStatus.REUTILIZACION_ULTIMA;
         }
 
-        // no reutilizar en 12 meses: traer hashes del historial y verificar
-        LocalDateTime desde = LocalDateTime.now().minusMonths(NO_REUSE_MESES);
+        // no reutilizar en X meses: traer hashes del historial y verificar
+        LocalDateTime desde = LocalDateTime.now().minusMonths(passwordPolicyUtil.getNoReuseMeses());
         List<String> hashes = hContraseniaDAO.findHashesSince(u.getIdUsuario(), desde);
         boolean reused = hashes.stream().anyMatch(h -> bcrypt.matches(nuevaPlano, h));
         if (reused) return PasswordChangeStatus.REUTILIZACION_HISTORIAL;
@@ -107,9 +127,9 @@ public class SecurityBL {
         actual.setContrasenia(nuevoHash);
         actual.setFechaCreacion(LocalDate.now());
         actual.setUltimoLog(LocalDate.now());
-        actual.setLongitud(MIN_LENGTH);
-        actual.setComplejidad(COMPLEJIDAD);
-        actual.setIntentosRestantes(MAX_INTENTOS);
+        actual.setLongitud(nuevaPlano.length()); // Set actual length of new password
+        actual.setComplejidad(passwordPolicyUtil.calcularComplejidad(nuevaPlano)); // Calculate actual complexity
+        actual.setIntentosRestantes(passwordPolicyUtil.getMaxIntentos());
         contraseniaDAO.save(actual);
 
         u.setCambioContrasenia(false);
@@ -125,9 +145,61 @@ public class SecurityBL {
         c.setContrasenia(hash);
         c.setFechaCreacion(LocalDate.now());
         c.setUltimoLog(LocalDate.now());
-        c.setLongitud(MIN_LENGTH);
-        c.setComplejidad(COMPLEJIDAD);
-        c.setIntentosRestantes(MAX_INTENTOS);
+        c.setLongitud(passwordPolicyUtil.getMinLength());
+        c.setComplejidad(passwordPolicyUtil.getComplejidad());
+        c.setIntentosRestantes(passwordPolicyUtil.getMaxIntentos());
         return contraseniaDAO.save(c);
+    }
+
+    /**
+     * Login method for Estudiante entities that have their own intentos_restantes field
+     * This provides consistent attempt tracking behavior across all user types
+     */
+    @Transactional
+    public LoginStatus loginEstudiante(com.usei.usei.models.Estudiante estudiante, String passwordPlano) {
+        if (estudiante == null) return LoginStatus.CREDENCIALES;
+        
+        // Check if account is blocked
+        if (estudiante.getIntentosRestantes() <= 0) return LoginStatus.BLOQUEADO;
+
+        // Validate password - Estudiante stores plain text password for now
+        boolean ok = estudiante.getContrasena().equals(passwordPlano);
+        
+        if (!ok) {
+            // Decrement attempts and save
+            int rest = Math.max(0, estudiante.getIntentosRestantes() - 1);
+            estudiante.setIntentosRestantes(rest);
+            // Note: Estudiante will be saved by the calling service
+            return (rest == 0) ? LoginStatus.BLOQUEADO : LoginStatus.CREDENCIALES;
+        }
+
+        // Successful login - reset attempts
+        estudiante.setIntentosRestantes(passwordPolicyUtil.getMaxIntentos());
+        // Note: Estudiante will be saved by the calling service
+        return LoginStatus.OK;
+    }
+
+    /**
+     * Mark all users for mandatory password change when security policies are updated.
+     * This method should be called whenever security policies are modified by the Security role.
+     */
+    @Transactional
+    public void enforcePasswordPolicyUpdateForAllUsers() {
+        System.out.println("🔒 Enforcing password policy update for all users...");
+        
+        // Get all users and mark them for password change
+        Iterable<Usuario> allUsers = usuarioService.findAll();
+        int updatedCount = 0;
+        
+        for (Usuario user : allUsers) {
+            // Only mark users who currently have a password
+            if (user.getContraseniaEntity() != null) {
+                user.setCambioContrasenia(true);
+                usuarioService.save(user);
+                updatedCount++;
+            }
+        }
+        
+        System.out.println("🔒 Marked " + updatedCount + " users for mandatory password change due to policy update.");
     }
 }

@@ -82,6 +82,7 @@ CREATE TABLE Estudiante (
     semestre int  NOT NULL,
     estado_invitacion varchar(50)  NOT NULL,
     contrasena varchar(100)  NOT NULL,
+    intentos_restantes int  NOT NULL DEFAULT 3,
     CONSTRAINT Estudiante_pk PRIMARY KEY (id_estudiante)
 );
 
@@ -312,9 +313,27 @@ CREATE TABLE Usuario (
     carrera varchar(40)  NOT NULL,
     rol varchar(20)  NOT NULL,
     ci varchar(20)  NOT NULL,
+    intentos_restantes int  NOT NULL DEFAULT 3,
     Roles_id_rol int  NOT NULL,
     Contrasenia_id_pass int  NOT NULL,
     CONSTRAINT Usuario_pk PRIMARY KEY (id_usuario)
+);
+
+-- Table: ConfiguracionSeguridad - Configurable security policies for Security role users
+CREATE TABLE configuracion_seguridad (
+    id_config serial  NOT NULL,
+    min_longitud_contrasenia int  NOT NULL DEFAULT 12,
+    max_intentos_login int  NOT NULL DEFAULT 3,
+    dias_expiracion_contrasenia int  NOT NULL DEFAULT 60,
+    meses_no_reutilizar int  NOT NULL DEFAULT 12,
+    requerir_mayusculas boolean  NOT NULL DEFAULT true,
+    requerir_minusculas boolean  NOT NULL DEFAULT true,
+    requerir_numeros boolean  NOT NULL DEFAULT true,
+    requerir_simbolos boolean  NOT NULL DEFAULT true,
+    fecha_modificacion timestamp  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    usuario_modificacion int  NOT NULL DEFAULT 1,
+    activa boolean  NOT NULL DEFAULT true,
+    CONSTRAINT configuracion_seguridad_pk PRIMARY KEY (id_config)
 );
 
 -- foreign keys
@@ -496,7 +515,32 @@ ALTER TABLE H_Contrasenia
 -- 3) (opcional) Index para consultas por id_pass/TX_DATE
 CREATE INDEX IF NOT EXISTS idx_hc_txdate ON H_Contrasenia (id_pass, tx_date DESC);
 
-
+-- Insert default security configuration
+INSERT INTO configuracion_seguridad (
+    min_longitud_contrasenia, 
+    max_intentos_login, 
+    dias_expiracion_contrasenia, 
+    meses_no_reutilizar,
+    requerir_mayusculas, 
+    requerir_minusculas, 
+    requerir_numeros, 
+    requerir_simbolos,
+    fecha_modificacion,
+    usuario_modificacion,
+    activa
+) VALUES (
+    12,    -- Minimum password length
+    3,     -- Maximum login attempts  
+    60,    -- Password expiry in days
+    12,    -- Months before password can be reused
+    true,  -- Require uppercase letters
+    true,  -- Require lowercase letters 
+    true,  -- Require numbers
+    true,  -- Require special characters
+    CURRENT_TIMESTAMP,
+    1,     -- Default user ID (system)
+    true   -- Configuration is active
+);
 
 
 -- End of file.

@@ -7,9 +7,12 @@ import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import jakarta.persistence.LockModeType;
 
 import com.usei.usei.models.Estudiante;
 
@@ -20,6 +23,14 @@ public interface EstudianteDAO extends  JpaRepository<Estudiante, Long> {
 
        // AGREGAR ESTE MÉTODO para buscar por correo
     Optional<Estudiante> findByCorreoInstitucional(String correoInstitucional);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT e FROM Estudiante e WHERE e.ci = :ci")
+    Optional<Estudiante> findByCiForUpdate(@Param("ci") int ci);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Estudiante e SET e.intentosRestantes = :intentos WHERE e.ci = :ci")
+    int updateIntentosByCi(@Param("ci") int ci, @Param("intentos") int intentos);
 
     List<Estudiante> findByCorreoInstitucionalIsNotNull();
 
