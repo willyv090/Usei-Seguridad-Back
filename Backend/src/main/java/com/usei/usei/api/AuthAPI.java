@@ -8,6 +8,7 @@ import com.usei.usei.util.TokenGenerator;
 import com.usei.usei.services.CaptchaService;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value; // <-- agregado
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -27,8 +28,16 @@ public class AuthAPI {
     @Autowired
     private TokenGenerator tokenGenerator;
 
-     @Autowired
-    private CaptchaService captchaService; 
+    @Autowired
+    private CaptchaService captchaService;
+
+    // ======== NUEVO: banderas de configuración para el captcha ========
+    @Value("${security.captcha.enabled:true}")
+    private boolean captchaEnabled; // si es false, se salta toda la validación
+
+    @Value("${security.captcha.dev-bypass-token:}")
+    private String captchaDevBypassToken; // si coincide con el token recibido, considera válido
+    // ==================================================================
 
     /**
      * Endpoint unificado de login para Usuario y Estudiante
@@ -37,27 +46,36 @@ public class AuthAPI {
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody UnifiedLoginRequest request) {
         try {
-            if (request.getCaptchaToken() == null || request.getCaptchaToken().isEmpty()) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
-                    new UnsuccessfulResponse(
-                        "400 Bad Request",
-                        "El token de reCAPTCHA es obligatorio",
-                        "/auth/login"
-                    )
-                );
-            }
+            // ============== CAPTCHA (con control por config y bypass) ==============
+            if (captchaEnabled) {
+                // 1) Debe venir token
+                if (request.getCaptchaToken() == null || request.getCaptchaToken().isEmpty()) {
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+                        new UnsuccessfulResponse(
+                            "400 Bad Request",
+                            "El token de reCAPTCHA es obligatorio",
+                            "/auth/login"
+                        )
+                    );
+                }
 
-            // 2. Validar el captcha con Google
-            boolean captchaValido = captchaService.verifyCaptcha(request.getCaptchaToken());
-            if (!captchaValido) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
-                    new UnsuccessfulResponse(
-                        "403 Forbidden",
-                        "Verificación de reCAPTCHA fallida. Por favor, inténtelo de nuevo.",
-                        "/auth/login"
-                    )
-                );
+                // 2) Bypass de desarrollo por token (si está configurado)
+                boolean bypassOk = (captchaDevBypassToken != null && !captchaDevBypassToken.isBlank()
+                        && captchaDevBypassToken.equals(request.getCaptchaToken()));
+
+                // 3) Validación real contra el servicio (o bypass)
+                boolean captchaValido = bypassOk || captchaService.verifyCaptcha(request.getCaptchaToken());
+                if (!captchaValido) {
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
+                        new UnsuccessfulResponse(
+                            "403 Forbidden",
+                            "Verificación de reCAPTCHA fallida. Por favor, inténtelo de nuevo.",
+                            "/auth/login"
+                        )
+                    );
+                }
             }
+            // ======================================================================
 
             // Validar que vengan los datos requeridos
             if (request.getCorreo() == null || request.getCorreo().trim().isEmpty()) {
@@ -88,7 +106,7 @@ public class AuthAPI {
             
             Boolean success = (Boolean) authResult.get("success");
             
-            // Si falla la autenticación
+            // Si falla la autenticación (tu lógica intacta)
             if (!success) {
                 String message = (String) authResult.get("message");
                 Boolean expired = (Boolean) authResult.getOrDefault("expired", false);
@@ -119,7 +137,7 @@ public class AuthAPI {
                     "/auth/login"
                 );
                 
-                // Add extra data for policy update case by creating a Map response
+                // Caso especial: política actualizada -> mapa con info adicional (tu lógica intacta)
                 if (politicaActualizada) {
                     Map<String, Object> policyResponse = new HashMap<>();
                     policyResponse.put("timeStamp", response.getTimeStamp());
@@ -134,16 +152,47 @@ public class AuthAPI {
                 return ResponseEntity.status(status).body(response);
             }
             
-            
-            // Login exitoso
-           String tipo = (String) authResult.get("tipo");
+            // Login exitoso (tu lógica existente)
+            String tipo = (String) authResult.get("tipo");
             @SuppressWarnings("unchecked")
             Map<String, Object> data = (Map<String, Object>) authResult.get("data"); 
             @SuppressWarnings("unchecked")
             List<String> accesos = (List<String>) authResult.get("accesos");
 
-            String token = "";
+            // =========================
+            // 👇 **NUEVO: PRIMER LOGIN**
+            // =========================
+            // Si es 'usuario' y el flag 'cambio_contrasenia' viene en true -> forzar cambio de contraseña
+            boolean requireFirstChange = false;
+            if ("usuario".equalsIgnoreCase(tipo) && data != null) {
+                Object changeFlag = data.get("cambio_contrasenia");
+                requireFirstChange = (changeFlag instanceof Boolean)
+                        ? (Boolean) changeFlag
+                        : "true".equalsIgnoreCase(String.valueOf(changeFlag));
+            }
 
+            if (requireFirstChange) {
+                Map<String, Object> payload = new HashMap<>();
+                payload.put("status", "403 Forbidden");
+                payload.put("reason", "FIRST_LOGIN_PASSWORD_CHANGE_REQUIRED");
+                payload.put("message", "Debe cambiar su contraseña (primer ingreso).");
+                payload.put("redirect", "/usuario/change-password");
+                // datos útiles para el front
+                payload.put("id_usuario", data.get("id_usuario"));
+                payload.put("correo", data.get("correo"));
+                payload.put("carrera", data.get("carrera"));
+                payload.put("nombre", data.get("nombre"));
+                payload.put("ci", data.get("ci"));
+                payload.put("cambio_contrasenia", true);
+                // Nota: no generamos token hasta que cambie la contraseña
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(payload);
+            }
+            // =========================
+            // 👆 **FIN PRIMER LOGIN**
+            // =========================
+
+            // Generar token normal (tu lógica intacta)
+            String token = "";
             if ("usuario".equals(tipo)) {
                 String idUsuario = String.valueOf(data.get("id_usuario"));
                 String correoUsuario = (String) data.get("correo");
@@ -167,7 +216,7 @@ public class AuthAPI {
                 );
             }
 
-            //Agregar accesos dentro de data 
+            //Agregar accesos dentro de data (tu lógica intacta)
             if (!data.containsKey("accesos") && accesos != null) {
                 data.put("accesos", accesos);
             }
@@ -194,4 +243,5 @@ public class AuthAPI {
                 ));
         }
     }
+
 }
