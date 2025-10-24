@@ -6,10 +6,9 @@ import com.usei.usei.models.Rol;
 
 public interface RolDAO extends CrudRepository<Rol, Long> {
 
+    Optional<Rol> findByNombreRolIgnoreCase(String nombreRol);
     Optional<Rol> findByNombreRol(String nombreRol);
-
-    boolean existsByNombreRol(String nombreRol);
-
-    // 🔹 Opcional: listar por estado (si lo usas en el futuro)
+    boolean existsByNombreRolIgnoreCase(String nombreRol);
     Iterable<Rol> findByActivo(Boolean activo);
+
 }

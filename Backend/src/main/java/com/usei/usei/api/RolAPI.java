@@ -13,13 +13,13 @@ import java.util.Arrays;
 
 @RestController
 @RequestMapping("/rol")
-@CrossOrigin(origins = "*") // 🔹 habilita llamadas desde el frontend
+@CrossOrigin(origins = "*")
 public class RolAPI {
 
     @Autowired
     private RolBL rolBL;
 
-    // ✅ Crear rol completo
+    // Crear rol completo
     @PostMapping
     public ResponseEntity<?> crear(@RequestBody Rol rol) {
         try {
@@ -39,7 +39,7 @@ public class RolAPI {
         }
     }
 
-    // ✅ Listar roles
+    // Listar roles
     @GetMapping
     public ResponseEntity<?> listar() {
         try {
@@ -51,7 +51,7 @@ public class RolAPI {
         }
     }
 
-    // ✅ Eliminar rol
+    // Eliminar rol
     @DeleteMapping("/{idRol}")
     public ResponseEntity<?> eliminar(@PathVariable Long idRol) {
         try {
@@ -66,7 +66,7 @@ public class RolAPI {
         }
     }
 
-    // ✅ Cambiar estado (activar/desactivar rol)
+    // Cambiar estado (activar/desactivar rol)
     @PutMapping("/{idRol}/estado")
     public ResponseEntity<?> cambiarEstado(@PathVariable Long idRol, @RequestBody Rol rolRequest) {
         try {
@@ -82,7 +82,7 @@ public class RolAPI {
         }
     }
 
-    // ✅ Obtener rol por ID
+    // Obtener rol por ID
     @GetMapping("/{idRol}")
     public ResponseEntity<?> obtenerPorId(@PathVariable Long idRol) {
         Rol rol = rolBL.obtenerRolPorId(idRol);
@@ -141,6 +141,8 @@ public class RolAPI {
                 ));
         }
     }
+
+    // Obtener los accesos
     @GetMapping("/{idRol}/accesos")
     public ResponseEntity<?> obtenerAccesos(@PathVariable Long idRol) {
         try {
