@@ -5,16 +5,10 @@ import com.usei.usei.models.ConfiguracionSeguridad;
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
 
-/**
- * Dynamic password policy utility that reads configuration from database
- * Converted from static utility to Spring component to allow dependency injection
- */
 @Component
 public class PasswordPolicyUtil {
 
     private final ConfiguracionSeguridadBL configuracionService;
-
-    // Fallback constants in case database is not available
     public static final int DEFAULT_MIN_LENGTH = 12;
     public static final int DEFAULT_COMPLEJIDAD = 4;
     public static final int DEFAULT_MAX_INTENTOS = 3;
@@ -30,9 +24,6 @@ public class PasswordPolicyUtil {
         this.configuracionService = configuracionService;
     }
 
-    /**
-     * Check if password meets current policy requirements
-     */
     public boolean cumplePolitica(String plain) {
         ConfiguracionSeguridad config = getCurrentConfig();
         
@@ -59,37 +50,22 @@ public class PasswordPolicyUtil {
         return true;
     }
 
-    /**
-     * Get current minimum password length
-     */
     public int getMinLength() {
         return getCurrentConfig().getMinLongitudContrasenia();
     }
 
-    /**
-     * Get current maximum login attempts
-     */
     public int getMaxIntentos() {
         return getCurrentConfig().getMaxIntentosLogin();
     }
 
-    /**
-     * Get password expiry days
-     */
     public int getExpiraDias() {
         return getCurrentConfig().getDiasExpiracionContrasenia();
     }
 
-    /**
-     * Get months before password can be reused
-     */
     public int getNoReuseMeses() {
         return getCurrentConfig().getMesesNoReutilizar();
     }
 
-    /**
-     * Calculate complexity score based on current policy
-     */
     public int getComplejidad() {
         ConfiguracionSeguridad config = getCurrentConfig();
         int complejidad = 0;
@@ -102,9 +78,6 @@ public class PasswordPolicyUtil {
         return complejidad;
     }
 
-    /**
-     * Calculate the actual complexity of a password based on character types
-     */
     public int calcularComplejidad(String password) {
         if (password == null || password.isEmpty()) {
             return 0;
@@ -131,9 +104,6 @@ public class PasswordPolicyUtil {
         return complexity;
     }
 
-    /**
-     * Get current configuration, with fallback to defaults
-     */
     private ConfiguracionSeguridad getCurrentConfig() {
         try {
             return configuracionService.getCurrentConfigurationOrDefault();
@@ -143,9 +113,6 @@ public class PasswordPolicyUtil {
         }
     }
 
-    /**
-     * Create a default configuration for fallback scenarios
-     */
     private ConfiguracionSeguridad createDefaultConfig() {
         return new ConfiguracionSeguridad(
             DEFAULT_MIN_LENGTH,
@@ -173,25 +140,21 @@ public class PasswordPolicyUtil {
     @Deprecated
     public static final int NO_REUSE_MESES = DEFAULT_NO_REUSE_MESES;
 
-    /**
-     * Check if an existing password complies with current security policies.
-     * Forces password update ONLY when policies have been changed after password creation.
-     */
     public boolean existingPasswordCompliesWithCurrentPolicy(com.usei.usei.models.Contrasenia contrasenia) {
         if (contrasenia == null) {
-            System.out.println("❌ POLICY CHECK: Password is null - forcing update");
+            System.out.println("POLICY CHECK: Password is null - forcing update");
             return false;
         }
         
         ConfiguracionSeguridad config = getCurrentConfig();
-        System.out.println("🔒 === POLICY COMPLIANCE CHECK ===");
+        System.out.println("POLICY COMPLIANCE CHECK");
         
-        // MAIN CHECK: If password was created before policy was last modified, force update
+        // If password was created before policy was last modified, force update
         java.time.LocalDate passwordCreated = contrasenia.getFechaCreacion();
         java.time.LocalDateTime policyModified = config.getFechaModificacion();
         
-        System.out.println("🔒 Password created on: " + passwordCreated);
-        System.out.println("🔒 Policy last modified: " + policyModified);
+        System.out.println("Password created on: " + passwordCreated);
+        System.out.println("Policy last modified: " + policyModified);
         
         if (passwordCreated != null && policyModified != null) {
             // Convert password creation date to start of day for comparison
@@ -207,45 +170,45 @@ public class PasswordPolicyUtil {
             boolean passwordCreatedWithinBuffer = passwordCreatedDateTime.isAfter(policyModified) && 
                                                  passwordCreatedDateTime.isBefore(oneHourAfterPolicy);
             
-            System.out.println("🔒 Password created today? " + passwordCreatedToday);
-            System.out.println("🔒 Password created within buffer after policy? " + passwordCreatedWithinBuffer);
+            System.out.println("Password created today? " + passwordCreatedToday);
+            System.out.println("Password created within buffer after policy? " + passwordCreatedWithinBuffer);
             
             if (passwordCreatedToday || passwordCreatedWithinBuffer) {
-                System.out.println("✅ Password was created/updated recently - considering it compliant with current policies");
+                System.out.println("Password was created/updated recently - considering it compliant with current policies");
             } else {
                 // If password was created before the policy was last modified, force update
                 if (passwordCreatedDateTime.isBefore(policyModified)) {
-                    System.out.println("❌ POLICY ENFORCEMENT: Password created BEFORE policy update!");
-                    System.out.println("❌ Password date: " + passwordCreatedDateTime + ", Policy modified: " + policyModified);
-                    System.out.println("❌ FORCING PASSWORD CHANGE - Security policies have been updated");
+                    System.out.println("POLICY ENFORCEMENT: Password created BEFORE policy update!");
+                    System.out.println("Password date: " + passwordCreatedDateTime + ", Policy modified: " + policyModified);
+                    System.out.println("FORCING PASSWORD CHANGE - Security policies have been updated");
                     return false;
                 } else {
-                    System.out.println("✅ Password created AFTER policy update - checking compliance...");
+                    System.out.println("Password created AFTER policy update - checking compliance...");
                 }
             }
         }
         
-        // SECONDARY CHECK: Verify password still meets current requirements
-        System.out.println("🔒 Checking current policy compliance...");
-        System.out.println("🔒 Password length: " + contrasenia.getLongitud() + ", Required: " + config.getMinLongitudContrasenia());
+        // Verify password still meets current requirements
+        System.out.println("Checking current policy compliance...");
+        System.out.println("Password length: " + contrasenia.getLongitud() + ", Required: " + config.getMinLongitudContrasenia());
         
         if (contrasenia.getLongitud() < config.getMinLongitudContrasenia()) {
-            System.out.println("❌ Password too short for current policy - forcing update");
+            System.out.println("Password too short for current policy - forcing update");
             return false;
         }
         
         int currentComplexity = contrasenia.getComplejidad();
         int requiredComplexity = getComplejidad();
         
-        System.out.println("🔒 Password complexity: " + currentComplexity + ", Required: " + requiredComplexity);
+        System.out.println("Password complexity: " + currentComplexity + ", Required: " + requiredComplexity);
         
         if (currentComplexity < requiredComplexity) {
-            System.out.println("❌ Password complexity insufficient for current policy - forcing update");
+            System.out.println("Password complexity insufficient for current policy - forcing update");
             return false;
         }
         
         // Password is compliant with current policy
-        System.out.println("✅ Password complies with current policy - allowing login");
+        System.out.println("Password complies with current policy - allowing login");
         return true;
     }
 }

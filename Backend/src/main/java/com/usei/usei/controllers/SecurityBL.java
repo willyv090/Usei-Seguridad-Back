@@ -42,8 +42,6 @@ public class SecurityBL {
         Usuario u = ou.get();
         Contrasenia c = u.getContraseniaEntity();
         if (c == null) return LoginStatus.CREDENCIALES;
-
-        // int primitivo: no comparar con null
         if (c.getIntentosRestantes() <= 0) return LoginStatus.BLOQUEADO;
 
         boolean ok = bcrypt.matches(passwordPlano, c.getContrasenia());
@@ -54,7 +52,6 @@ public class SecurityBL {
             return (rest == 0) ? LoginStatus.BLOQUEADO : LoginStatus.CREDENCIALES;
         }
 
-        // Password is correct, reset attempts
         c.setIntentosRestantes(passwordPolicyUtil.getMaxIntentos());
         c.setUltimoLog(LocalDate.now());
         contraseniaDAO.save(c);
@@ -62,26 +59,26 @@ public class SecurityBL {
         // Check if password has expired
         LocalDate fc = c.getFechaCreacion();
         if (fc != null && LocalDate.now().isAfter(fc.plusDays(passwordPolicyUtil.getExpiraDias()))) {
-            System.out.println("🔒 Password expired for user: " + correo);
+            System.out.println("Password expired for user: " + correo);
             return LoginStatus.EXPIRADA;
         }
 
-        // NEW: Check if existing password complies with current security policies
-        System.out.println("🔒 === CHECKING POLICY COMPLIANCE FOR USER: " + correo + " ===");
+        // Check if existing password complies with current security policies
+        System.out.println("=== CHECKING POLICY COMPLIANCE FOR USER: " + correo + " ===");
         boolean complies = passwordPolicyUtil.existingPasswordCompliesWithCurrentPolicy(c);
-        System.out.println("🔒 Policy compliance result: " + complies);
+        System.out.println("Policy compliance result: " + complies);
         
         if (!complies) {
-            System.out.println("🔒 Password does not comply with current policies - forcing password change");
-            System.out.println("🔒 User: " + correo + " (ID: " + u.getIdUsuario() + ")");
+            System.out.println("Password does not comply with current policies - forcing password change");
+            System.out.println("User: " + correo + " (ID: " + u.getIdUsuario() + ")");
             // Mark user for mandatory password change
             u.setCambioContrasenia(true);
             usuarioService.save(u);
-            System.out.println("🔒 User marked for password change, returning POLITICA_ACTUALIZADA");
+            System.out.println("User marked for password change, returning POLITICA_ACTUALIZADA");
             return LoginStatus.POLITICA_ACTUALIZADA;
         }
 
-        System.out.println("✅ Login successful for user: " + correo);
+        System.out.println("Login successful for user: " + correo);
         return LoginStatus.OK;
     }
 
@@ -151,10 +148,6 @@ public class SecurityBL {
         return contraseniaDAO.save(c);
     }
 
-    /**
-     * Login method for Estudiante entities that have their own intentos_restantes field
-     * This provides consistent attempt tracking behavior across all user types
-     */
     @Transactional
     public LoginStatus loginEstudiante(com.usei.usei.models.Estudiante estudiante, String passwordPlano) {
         if (estudiante == null) return LoginStatus.CREDENCIALES;
@@ -179,13 +172,9 @@ public class SecurityBL {
         return LoginStatus.OK;
     }
 
-    /**
-     * Mark all users for mandatory password change when security policies are updated.
-     * This method should be called whenever security policies are modified by the Security role.
-     */
     @Transactional
     public void enforcePasswordPolicyUpdateForAllUsers() {
-        System.out.println("🔒 Enforcing password policy update for all users...");
+        System.out.println("Enforcing password policy update for all users...");
         
         // Get all users and mark them for password change
         Iterable<Usuario> allUsers = usuarioService.findAll();
@@ -200,6 +189,6 @@ public class SecurityBL {
             }
         }
         
-        System.out.println("🔒 Marked " + updatedCount + " users for mandatory password change due to policy update.");
+        System.out.println("Marked " + updatedCount + " users for mandatory password change due to policy update.");
     }
 }

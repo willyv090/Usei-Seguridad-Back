@@ -9,9 +9,6 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Business logic implementation for managing security configuration
- */
 @Service
 public class ConfiguracionSeguridadBL implements ConfiguracionSeguridadService {
 
@@ -46,9 +43,9 @@ public class ConfiguracionSeguridadBL implements ConfiguracionSeguridadService {
 
         ConfiguracionSeguridad saved = configuracionDAO.save(newConfig);
 
-        System.out.println("✅ Security configuration updated successfully!");
-        System.out.println("✅ New configuration ID: " + saved.getIdConfig());
-        System.out.println("✅ Users will be forced to update passwords on next login based on new policies.");
+        System.out.println("Security configuration updated successfully!");
+        System.out.println("New configuration ID: " + saved.getIdConfig());
+        System.out.println("Users will be forced to update passwords on next login based on new policies.");
 
         return saved;
     }
@@ -71,10 +68,6 @@ public class ConfiguracionSeguridadBL implements ConfiguracionSeguridadService {
         return configuracionDAO.existsActiveConfiguration();
     }
 
-    /**
-     * Get the current configuration or create a default one if none exists
-     * This ensures the system always has a valid configuration
-     */
     @Transactional
     public ConfiguracionSeguridad getCurrentConfigurationOrDefault() {
         Optional<ConfiguracionSeguridad> config = getActiveConfiguration();

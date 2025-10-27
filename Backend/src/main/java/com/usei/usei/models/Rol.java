@@ -37,7 +37,6 @@ public class Rol {
 
     public Boolean getActivo() { return activo; }
 
-    // ✅ Nuevo getter compatible con JSON y boolean primitivo
     public boolean isActivo() { return Boolean.TRUE.equals(activo); }
 
     public void setActivo(Boolean activo) { this.activo = activo; }

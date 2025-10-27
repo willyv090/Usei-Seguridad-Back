@@ -1,8 +1,6 @@
 package com.usei.usei.api;
 
 import java.util.*;
-import java.util.stream.Collectors;
-
 import com.usei.usei.dto.response.UsuarioResponseDTO;
 import com.usei.usei.repositories.ContraseniaDAO;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,7 +42,6 @@ public class UsuarioAPI {
     @Autowired
     private SecurityBL securityBL;
 
-    // Constructor for debugging dependency injection
     public UsuarioAPI() {
         System.out.println("🔧 UsuarioAPI constructor called");
     }
@@ -59,10 +56,7 @@ public class UsuarioAPI {
         System.out.println("🔧 securityBL: " + (securityBL != null ? "OK" : "NULL"));
     }
 
-
-    // ===========================
     // CREAR USUARIO
-    // ===========================
    @PostMapping
     public ResponseEntity<?> create(@RequestBody Map<String, Object> body) {
         try {
@@ -84,7 +78,7 @@ public class UsuarioAPI {
             if (rol == null)
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("El rol especificado no existe.");
 
-            // ⚠️ NO crear Contrasenia aquí. Deja que UsuarioBL.save() lo haga y lo hashee.
+            // UsuarioBL.save() crea contraseña y lo hashea.
             Usuario nuevoUsuario = new Usuario();
             nuevoUsuario.setNombre(nombre);
             nuevoUsuario.setApellido(apellido);
@@ -95,7 +89,7 @@ public class UsuarioAPI {
             nuevoUsuario.setRol(rol.getNombreRol());
             nuevoUsuario.setRolEntity(rol);
 
-            // UsuarioBL.save() detecta contraseniaEntity == null, genera contraseña inicial, la HASHEA,
+            // UsuarioBL.save() detecta la entidad contraseña == null, genera contraseña inicial por defecto, la HASHEA,
             // aplica política, setea cambioContrasenia=true y envía el correo.
             Usuario saved = usuarioService.save(nuevoUsuario);
             saved.setContraseniaEntity(null);
@@ -108,9 +102,7 @@ public class UsuarioAPI {
         }
     }
 
-    // ===========================
     // OBTENER USUARIO POR ID
-    // ===========================
     @GetMapping("/{id_usuario}")
     public ResponseEntity<?> read(@PathVariable("id_usuario") Long idUsuario) {
         Optional<Usuario> oUsuario = usuarioService.findById(idUsuario);
@@ -121,9 +113,7 @@ public class UsuarioAPI {
         return ResponseEntity.ok(usuario);
     }
 
-    // ===========================
     // LISTAR TODOS LOS USUARIOS
-    // ===========================
     @GetMapping
     public ResponseEntity<?> readAll() {
         try {
@@ -152,9 +142,7 @@ public class UsuarioAPI {
         }
     }
 
-    // ===========================
     // ELIMINAR USUARIO
-    // ===========================
     @DeleteMapping("/{id_usuario}")
     public ResponseEntity<?> delete(@PathVariable("id_usuario") Long idUsuario) {
         Optional<Usuario> oUsuario = usuarioService.findById(idUsuario);
@@ -164,9 +152,8 @@ public class UsuarioAPI {
         return ResponseEntity.ok("Usuario eliminado correctamente.");
     }
 
-    // ===========================
-    // ACTUALIZAR USUARIO (TOTAL)
-    // ===========================
+
+    // ACTUALIZAR USUARIO
     @PutMapping("/{id_usuario}")
     public ResponseEntity<?> update(@PathVariable("id_usuario") Long idUsuario, @RequestBody Usuario usuario) {
         Optional<Usuario> oUsuario = usuarioService.findById(idUsuario);
@@ -186,9 +173,7 @@ public class UsuarioAPI {
         return ResponseEntity.status(HttpStatus.CREATED).body(updated);
     }
 
-    // ===========================
-    // ACTUALIZAR USUARIO (PARCIAL - PATCH)
-    // ===========================
+    // EDITAR USUARIO
     @PatchMapping("/{id_usuario}")
         public ResponseEntity<?> editarUsuario(
                 @PathVariable("id_usuario") Long idUsuario,
@@ -262,6 +247,7 @@ public class UsuarioAPI {
             }
         }
 
+        // ENVIO DE CREDENCIALES USUARIO Y CONTRASEÑA POR  DEFECTO (INICIAL)
     @PostMapping("/{id}/enviarCredenciales")
     public ResponseEntity<?> enviarCredenciales(@PathVariable Long id) {
         try {
@@ -287,22 +273,20 @@ public class UsuarioAPI {
         }
     }
 
-    // ===========================
     // CAMBIAR CONTRASEÑA (con hash + políticas + historial)
-    // ===========================
     @PutMapping("/change-password")
     public ResponseEntity<?> changePassword(@RequestParam Long idUsuario,
                                             @RequestBody HashMap<String, String> body) {
         try {
-            System.out.println("🔍 === CHANGE PASSWORD DEBUG ===");
-            System.out.println("🔍 idUsuario: " + idUsuario);
-            System.out.println("🔍 securityBL is null? " + (securityBL == null));
-            System.out.println("🔍 usuarioService is null? " + (usuarioService == null));
-            System.out.println("🔍 tokenGenerator is null? " + (tokenGenerator == null));
-            System.out.println("🔍 rolBL is null? " + (rolBL == null));
+            System.out.println("=== CHANGE PASSWORD DEBUG ===");
+            System.out.println("idUsuario: " + idUsuario);
+            System.out.println("securityBL is null? " + (securityBL == null));
+            System.out.println("usuarioService is null? " + (usuarioService == null));
+            System.out.println("tokenGenerator is null? " + (tokenGenerator == null));
+            System.out.println("rolBL is null? " + (rolBL == null));
             
             if (securityBL == null) {
-                System.err.println("❌ SecurityBL is null! Dependency injection failed!");
+                System.err.println("SecurityBL is null! Dependency injection failed!");
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                         .body("Error de configuración: SecurityBL no está disponible. Contacte al administrador.");
             }
@@ -312,9 +296,9 @@ public class UsuarioAPI {
                 return ResponseEntity.badRequest().body("La nueva contraseña no puede estar vacía.");
             }
 
-            System.out.println("🔍 Calling securityBL.changePassword...");
+            System.out.println("Calling securityBL.changePassword...");
             PasswordChangeStatus status = securityBL.changePassword(idUsuario, nuevaPassStr);
-            System.out.println("🔍 Password change status: " + status);
+            System.out.println("Password change status: " + status);
 
             switch (status) {
                 case CAMBIO_OK:
@@ -332,122 +316,115 @@ public class UsuarioAPI {
                     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("No se pudo cambiar la contraseña.");
             }
         } catch (Exception e) {
-            System.err.println("❌ Exception in changePassword: " + e.getClass().getSimpleName());
-            System.err.println("❌ Message: " + e.getMessage());
+            System.err.println("Exception in changePassword: " + e.getClass().getSimpleName());
+            System.err.println("Message: " + e.getMessage());
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error al cambiar la contraseña: " + e.getMessage());
         }
     }
 
-    // ===========================
-        // VERIFICAR DUPLICADOS (correo / ci)
-        // ===========================
-    @GetMapping("/verificar")
-    public ResponseEntity<?> verificarDuplicados(
-            @RequestParam(required = false) String correo,
-            @RequestParam(required = false) String ci) {
+        // VERIFICACION DE DUPLICADOS (correo / ci)
+        @GetMapping("/verificar")
+        public ResponseEntity<?> verificarDuplicados(
+                @RequestParam(required = false) String correo,
+                @RequestParam(required = false) String ci) {
 
-        try {
-            Map<String, Boolean> result = new HashMap<>();
-            result.put("existeCorreo", correo != null && usuarioService.findByCorreo(correo).isPresent());
-            result.put("existeCi", ci != null && usuarioService.existsByCi(ci));
-            return ResponseEntity.ok(result);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Error al verificar duplicados: " + e.getMessage());
-        }
-    }
-
-
-    // ===========================
-    // LOGIN
-    // ===========================
-    @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequestUserDTO loginRequestUser) {
-        try {
-            // Use SecurityBL to validate and decrement attempts on Contrasenia
-            LoginStatus status = securityBL.login(loginRequestUser.getCorreo(), loginRequestUser.getContrasena());
-            switch (status) {
-                case OK: {
-                    Optional<Usuario> usuario = usuarioService.findByCorreo(loginRequestUser.getCorreo());
-                    if (usuario.isPresent()) {
-                        Usuario user = usuario.get();
-                        user.setContraseniaEntity(null);
-
-                        String token = tokenGenerator.generateToken(
-                                String.valueOf(user.getIdUsuario()),
-                                user.getRol(),
-                                user.getCorreo(),
-                                60
-                        );
-
-                        Map<String, Object> data = new HashMap<>();
-                        data.put("id_usuario", user.getIdUsuario());
-                        data.put("rol", user.getRol());
-                        data.put("correo", user.getCorreo());
-                        data.put("carrera", user.getCarrera());
-                        data.put("nombre", user.getNombre());
-                        data.put("ci", user.getCi());
-                        data.put("cambio_contrasenia", user.getCambioContrasenia());
-
-                        SuccessfulResponse response = new SuccessfulResponse(
-                                "200 OK",
-                                "Inicio de sesión correcto",
-                                token,
-                                60,
-                                data
-                        );
-                        return ResponseEntity.ok(response);
-                    }
-                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Usuario no encontrado tras validación");
-                }
-                case BLOQUEADO: {
-                    UnsuccessfulResponse blocked = new UnsuccessfulResponse(
-                            "403 Forbidden",
-                            "Cuenta bloqueada por intentos fallidos. Use recuperación de contraseña.",
-                            "/usuario/recover"
-                    );
-                    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(blocked);
-                }
-                case CREDENCIALES: {
-                    // We can try to fetch remaining attempts to return to client
-                    Optional<Usuario> u = usuarioService.findByCorreo(loginRequestUser.getCorreo());
-                    Integer remaining = null;
-                    if (u.isPresent() && u.get().getContraseniaEntity() != null) remaining = u.get().getContraseniaEntity().getIntentosRestantes();
-                    Map<String,Object> payload = new HashMap<>();
-                    payload.put("status","401 Unauthorized");
-                    payload.put("message","Credenciales incorrectas");
-                    payload.put("remainingAttempts", remaining);
-                    return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(payload);
-                }
-                case EXPIRADA: {
-                    UnsuccessfulResponse expired = new UnsuccessfulResponse(
-                            "403 Forbidden",
-                            "Contraseña expirada. Debe cambiarla.",
-                            "/usuario/change-password"
-                    );
-                    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(expired);
-                }
-                case POLITICA_ACTUALIZADA: {
-                    UnsuccessfulResponse policyUpdated = new UnsuccessfulResponse(
-                            "403 Forbidden",
-                            "Las políticas de seguridad han sido actualizadas. Debe cambiar su contraseña para cumplir con los nuevos requisitos.",
-                            "/usuario/change-password"
-                    );
-                    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(policyUpdated);
-                }
-                default:
-                    return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new UnsuccessfulResponse("401", "Credenciales incorrectas", "/usuario/login"));
+            try {
+                Map<String, Boolean> result = new HashMap<>();
+                result.put("existeCorreo", correo != null && usuarioService.findByCorreo(correo).isPresent());
+                result.put("existeCi", ci != null && usuarioService.existsByCi(ci));
+                return ResponseEntity.ok(result);
+            } catch (Exception e) {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body("Error al verificar duplicados: " + e.getMessage());
             }
-        } catch (Exception e) {
-            return new ResponseEntity<>(new LoginResponse<Object>(e.getMessage()), HttpStatus.INTERNAL_SERVER_ERROR);
         }
-    }
 
-    // ===========================
+    // LOGIN
+        @PostMapping("/login")
+        public ResponseEntity<?> login(@RequestBody LoginRequestUserDTO loginRequestUser) {
+            try {
+                // Use SecurityBL to validate and decrement attempts on Contrasenia
+                LoginStatus status = securityBL.login(loginRequestUser.getCorreo(), loginRequestUser.getContrasena());
+                switch (status) {
+                    case OK: {
+                        Optional<Usuario> usuario = usuarioService.findByCorreo(loginRequestUser.getCorreo());
+                        if (usuario.isPresent()) {
+                            Usuario user = usuario.get();
+                            user.setContraseniaEntity(null);
+
+                            String token = tokenGenerator.generateToken(
+                                    String.valueOf(user.getIdUsuario()),
+                                    user.getRol(),
+                                    user.getCorreo(),
+                                    60
+                            );
+
+                            Map<String, Object> data = new HashMap<>();
+                            data.put("id_usuario", user.getIdUsuario());
+                            data.put("rol", user.getRol());
+                            data.put("correo", user.getCorreo());
+                            data.put("carrera", user.getCarrera());
+                            data.put("nombre", user.getNombre());
+                            data.put("ci", user.getCi());
+                            data.put("cambio_contrasenia", user.getCambioContrasenia());
+
+                            SuccessfulResponse response = new SuccessfulResponse(
+                                    "200 OK",
+                                    "Inicio de sesión correcto",
+                                    token,
+                                    60,
+                                    data
+                            );
+                            return ResponseEntity.ok(response);
+                        }
+                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Usuario no encontrado tras validación");
+                    }
+                    case BLOQUEADO: {
+                        UnsuccessfulResponse blocked = new UnsuccessfulResponse(
+                                "403 Forbidden",
+                                "Cuenta bloqueada por intentos fallidos. Use recuperación de contraseña.",
+                                "/usuario/recover"
+                        );
+                        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(blocked);
+                    }
+                    case CREDENCIALES: {
+                        // We can try to fetch remaining attempts to return to client
+                        Optional<Usuario> u = usuarioService.findByCorreo(loginRequestUser.getCorreo());
+                        Integer remaining = null;
+                        if (u.isPresent() && u.get().getContraseniaEntity() != null) remaining = u.get().getContraseniaEntity().getIntentosRestantes();
+                        Map<String,Object> payload = new HashMap<>();
+                        payload.put("status","401 Unauthorized");
+                        payload.put("message","Credenciales incorrectas");
+                        payload.put("remainingAttempts", remaining);
+                        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(payload);
+                    }
+                    case EXPIRADA: {
+                        UnsuccessfulResponse expired = new UnsuccessfulResponse(
+                                "403 Forbidden",
+                                "Contraseña expirada. Debe cambiarla.",
+                                "/usuario/change-password"
+                        );
+                        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(expired);
+                    }
+                    case POLITICA_ACTUALIZADA: {
+                        UnsuccessfulResponse policyUpdated = new UnsuccessfulResponse(
+                                "403 Forbidden",
+                                "Las políticas de seguridad han sido actualizadas. Debe cambiar su contraseña para cumplir con los nuevos requisitos.",
+                                "/usuario/change-password"
+                        );
+                        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(policyUpdated);
+                    }
+                    default:
+                        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new UnsuccessfulResponse("401", "Credenciales incorrectas", "/usuario/login"));
+                }
+            } catch (Exception e) {
+                return new ResponseEntity<>(new LoginResponse<Object>(e.getMessage()), HttpStatus.INTERNAL_SERVER_ERROR);
+            }
+        }
+
     // EMAIL: ENVIAR CÓDIGO
-    // ===========================
    // En UsuarioAPI
     // En com.usei.usei.api.UsuarioAPI
     @PostMapping("/enviarCodigoVerificacion")
@@ -470,13 +447,13 @@ public class UsuarioAPI {
             // envía el email y guarda el código asociado al correo
             usuarioService.enviarCodigoVerificacion(correo);
 
-            // DEV ONLY: exponer el código para validarlo en el front
+            // validacion en el front
             String codigoVerificacion = usuarioService.obtenerCodigoVerificacion();
 
             Map<String, Object> payload = new HashMap<>();
             payload.put("mensaje", "Código de verificación enviado exitosamente");
             payload.put("idUsuario", idUsuario);
-            payload.put("codigoVerificacion", codigoVerificacion); // <-- SOLO DEV
+            payload.put("codigoVerificacion", codigoVerificacion);
             return ResponseEntity.ok(payload);
 
         } catch (jakarta.mail.MessagingException e) {
@@ -488,11 +465,8 @@ public class UsuarioAPI {
         }
     }
 
-
-
-    // ===========================
     // ROLES
-    // ===========================
+    // LISTA DE ROLES DE ACUERDO AL ROL ASIGNADO AL USUARIO
     @GetMapping("/rol")
     public ResponseEntity<?> listarRoles() {
         try {
@@ -505,6 +479,7 @@ public class UsuarioAPI {
         }
     }
 
+    // ACTUALIZAR ESTADO DEL ROL ACTIVO O INACTIVO
     @PutMapping("/rol/{idRol}/estado")
     public ResponseEntity<?> actualizarEstadoRol(@PathVariable Long idRol, @RequestBody Map<String, Object> body) {
         try {
@@ -533,8 +508,8 @@ public class UsuarioAPI {
                 return ResponseEntity.badRequest().body("Email address is required");
             }
 
-            System.out.println("🧪 === EMAIL TEST ENDPOINT CALLED ===");
-            System.out.println("🧪 Testing email to: " + email);
+            System.out.println("=== EMAIL TEST ENDPOINT CALLED ===");
+            System.out.println("Testing email to: " + email);
 
             // Create a test user to send credentials
             Usuario testUser = new Usuario();
@@ -545,12 +520,12 @@ public class UsuarioAPI {
 
             usuarioService.enviarCredencialesUsuario(testUser);
 
-            System.out.println("🧪 === EMAIL TEST COMPLETED ===");
+            System.out.println("=== EMAIL TEST COMPLETED ===");
             return ResponseEntity.ok().body("Test email sent to " + email + ". Check backend logs for details.");
 
         } catch (Exception e) {
-            System.err.println("🧪 === EMAIL TEST FAILED ===");
-            System.err.println("🧪 Error: " + e.getMessage());
+            System.err.println("=== EMAIL TEST FAILED ===");
+            System.err.println("Error: " + e.getMessage());
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Email test failed: " + e.getMessage());
@@ -560,8 +535,8 @@ public class UsuarioAPI {
     @GetMapping("/test-security-bl")
     public ResponseEntity<?> testSecurityBL() {
         try {
-            System.out.println("🧪 === SECURITY BL TEST ===");
-            System.out.println("🧪 securityBL is null? " + (securityBL == null));
+            System.out.println("=== SECURITY BL TEST ===");
+            System.out.println("securityBL is null? " + (securityBL == null));
             
             if (securityBL == null) {
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -571,7 +546,7 @@ public class UsuarioAPI {
             return ResponseEntity.ok().body("SUCCESS: SecurityBL is properly injected!");
             
         } catch (Exception e) {
-            System.err.println("🧪 Error testing SecurityBL: " + e.getMessage());
+            System.err.println("Error testing SecurityBL: " + e.getMessage());
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Exception testing SecurityBL: " + e.getMessage());
@@ -581,7 +556,7 @@ public class UsuarioAPI {
     @PostMapping("/force-policy-enforcement")
     public ResponseEntity<?> forcePolicyEnforcement() {
         try {
-            System.out.println("🧪 === MANUAL POLICY ENFORCEMENT TEST ===");
+            System.out.println("=== MANUAL POLICY ENFORCEMENT TEST ===");
             
             if (securityBL == null) {
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -592,7 +567,7 @@ public class UsuarioAPI {
             return ResponseEntity.ok().body("Policy enforcement completed. Check logs for details.");
             
         } catch (Exception e) {
-            System.err.println("🧪 Error in manual policy enforcement: " + e.getMessage());
+            System.err.println("Error in manual policy enforcement: " + e.getMessage());
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error in policy enforcement: " + e.getMessage());
@@ -602,7 +577,7 @@ public class UsuarioAPI {
     @GetMapping("/check-password-change-flags")
     public ResponseEntity<?> checkPasswordChangeFlags() {
         try {
-            System.out.println("🧪 === CHECKING PASSWORD CHANGE FLAGS ===");
+            System.out.println("=== CHECKING PASSWORD CHANGE FLAGS ===");
             
             Iterable<Usuario> allUsers = usuarioService.findAll();
             Map<String, Object> result = new HashMap<>();
@@ -613,9 +588,9 @@ public class UsuarioAPI {
                 totalUsers++;
                 if (user.getCambioContrasenia() != null && user.getCambioContrasenia()) {
                     markedForChange++;
-                    System.out.println("🚩 User marked for password change: " + user.getCorreo() + " (ID: " + user.getIdUsuario() + ")");
+                    System.out.println("User marked for password change: " + user.getCorreo() + " (ID: " + user.getIdUsuario() + ")");
                 } else {
-                    System.out.println("✅ User NOT marked for password change: " + user.getCorreo() + " (ID: " + user.getIdUsuario() + ")");
+                    System.out.println("User NOT marked for password change: " + user.getCorreo() + " (ID: " + user.getIdUsuario() + ")");
                 }
             }
             
@@ -626,7 +601,7 @@ public class UsuarioAPI {
             return ResponseEntity.ok(result);
             
         } catch (Exception e) {
-            System.err.println("🧪 Error checking password change flags: " + e.getMessage());
+            System.err.println("Error checking password change flags: " + e.getMessage());
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error checking flags: " + e.getMessage());

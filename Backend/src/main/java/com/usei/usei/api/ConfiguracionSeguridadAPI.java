@@ -11,10 +11,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-/**
- * API Controller for managing security configuration policies
- * Only users with 'Seguridad' role should access these endpoints
- */
 @RestController
 @RequestMapping("/configuracion-seguridad")
 public class ConfiguracionSeguridadAPI {
@@ -25,10 +21,6 @@ public class ConfiguracionSeguridadAPI {
         this.configuracionService = configuracionService;
     }
 
-    /**
-     * Simple ping endpoint to check if backend is reachable
-     * GET /configuracion-seguridad/ping
-     */
     @GetMapping("/ping")
     public ResponseEntity<?> ping() {
         Map<String, Object> data = new HashMap<>();
@@ -45,10 +37,6 @@ public class ConfiguracionSeguridadAPI {
         return ResponseEntity.ok(response);
     }
 
-    /**
-     * Get current active security configuration
-     * GET /configuracion-seguridad/current
-     */
     @GetMapping("/current")
     public ResponseEntity<?> getCurrentConfiguration() {
         try {
@@ -110,10 +98,6 @@ public class ConfiguracionSeguridadAPI {
         }
     }
 
-    /**
-     * Return all configuration rows for admin/audit purposes
-     * GET /configuracion-seguridad/list
-     */
     @GetMapping("/list")
     public ResponseEntity<?> listAllConfigurations() {
         try {
@@ -147,22 +131,18 @@ public class ConfiguracionSeguridadAPI {
         }
     }
 
-    /**
-     * Update security configuration (only for Security role users)
-     * PUT /configuracion-seguridad
-     */
     @PutMapping
     public ResponseEntity<?> updateConfiguration(@RequestBody ConfiguracionSeguridad newConfig,
                                                 @RequestParam Long userId) {
         try {
-            System.out.println("🔧 === CONFIGURATION UPDATE REQUEST ===");
-            System.out.println("🔧 userId: " + userId);
-            System.out.println("🔧 New config - Min Length: " + newConfig.getMinLongitudContrasenia());
-            System.out.println("🔧 New config - Max Attempts: " + newConfig.getMaxIntentosLogin());
-            System.out.println("🔧 New config - Require Upper: " + newConfig.isRequerirMayusculas());
-            System.out.println("🔧 New config - Require Lower: " + newConfig.isRequerirMinusculas());
-            System.out.println("🔧 New config - Require Numbers: " + newConfig.isRequerirNumeros());
-            System.out.println("🔧 New config - Require Symbols: " + newConfig.isRequerirSimbolos());
+            System.out.println("=== CONFIGURATION UPDATE REQUEST ===");
+            System.out.println("userId: " + userId);
+            System.out.println("New config - Min Length: " + newConfig.getMinLongitudContrasenia());
+            System.out.println("New config - Max Attempts: " + newConfig.getMaxIntentosLogin());
+            System.out.println("New config - Require Upper: " + newConfig.isRequerirMayusculas());
+            System.out.println("New config - Require Lower: " + newConfig.isRequerirMinusculas());
+            System.out.println("New config - Require Numbers: " + newConfig.isRequerirNumeros());
+            System.out.println("New config - Require Symbols: " + newConfig.isRequerirSimbolos());
             
             // TODO: Add authorization check - only 'Seguridad' role should access this
             // You can implement this using @PreAuthorize("hasRole('Seguridad')") or manual check
@@ -214,10 +194,6 @@ public class ConfiguracionSeguridadAPI {
         }
     }
 
-    /**
-     * Get configuration by ID (for history/audit purposes)
-     * GET /configuracion-seguridad/{id}
-     */
     @GetMapping("/{id}")
     public ResponseEntity<?> getConfigurationById(@PathVariable Long id) {
         try {
@@ -253,9 +229,6 @@ public class ConfiguracionSeguridadAPI {
         }
     }
 
-    /**
-     * Validate configuration values to ensure they are reasonable
-     */
     private boolean isValidConfiguration(ConfiguracionSeguridad config) {
         // Minimum password length should be between 6 and 50 characters
         if (config.getMinLongitudContrasenia() < 6 || config.getMinLongitudContrasenia() > 50) {

@@ -4,10 +4,6 @@ import jakarta.persistence.*;
 import java.io.Serializable;
 import java.time.LocalDateTime;
 
-/**
- * Entity to store configurable security policies that can be managed by Security role users
- * This allows dynamic configuration of password policies, login attempts, etc.
- */
 @Entity
 @Table(name = "configuracion_seguridad")
 public class ConfiguracionSeguridad implements Serializable {

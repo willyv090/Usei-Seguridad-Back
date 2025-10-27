@@ -19,7 +19,7 @@ public class RolAPI {
     @Autowired
     private RolBL rolBL;
 
-    // Crear rol completo
+    // CREAR ROL
     @PostMapping
     public ResponseEntity<?> crear(@RequestBody Rol rol) {
         try {
@@ -105,6 +105,8 @@ public class RolAPI {
                     .body("Error al actualizar el rol: " + ex.getMessage());
         }
     }
+
+    //VERIFICAR ACCESO DE AUCERDO AL ROL Y SUS ACCESOS DEFINIDOS
     @PostMapping("/verificar-acceso")
     public ResponseEntity<?> verificarAcceso(@RequestBody Map<String, Object> request) {
         try {

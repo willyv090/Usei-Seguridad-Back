@@ -51,10 +51,10 @@ import jakarta.mail.MessagingException;
 @RequestMapping("/estudiante")
 public class EstudianteAPI {
     @Autowired
-private EstadoCertificadoService estadoCertificadoService;
+    private EstadoCertificadoService estadoCertificadoService;
 
-@Autowired
-private EstadoEncuestaService estadoEncuestaService;
+    @Autowired
+    private EstadoEncuestaService estadoEncuestaService;
 
 
     @Autowired
@@ -163,47 +163,46 @@ private EstadoEncuestaService estadoEncuestaService;
     }
 
     // Inicio de sesión de estudiante
-    // ❌ COMENTAR O ELIMINAR ESTE MÉTODO - Ahora se usa /auth/login
 /*
-@PostMapping("/login")
-public ResponseEntity<?> login(@RequestBody LoginRequestDTO loginRequest) {
-    try{
-        Optional<Estudiante> estudiante = estudianteService.login(loginRequest.getCi(), loginRequest.getContrasena());
-        if (estudiante.isPresent()) {
-            estudiante.get().setContrasena(null);
-            Estudiante foundEstudiante = estudiante.get();
-            String token = tokenGenerator.generateToken(String.valueOf(estudiante.get().getIdEstudiante()), "estudiante", estudiante.get().getCorreoInstitucional(), 60);
+        @PostMapping("/login")
+        public ResponseEntity<?> login(@RequestBody LoginRequestDTO loginRequest) {
+            try{
+                Optional<Estudiante> estudiante = estudianteService.login(loginRequest.getCi(), loginRequest.getContrasena());
+                if (estudiante.isPresent()) {
+                    estudiante.get().setContrasena(null);
+                    Estudiante foundEstudiante = estudiante.get();
+                    String token = tokenGenerator.generateToken(String.valueOf(estudiante.get().getIdEstudiante()), "estudiante", estudiante.get().getCorreoInstitucional(), 60);
 
-            Map<String, Object> data = new HashMap<>();
-            data.put("id_estudiante", foundEstudiante.getIdEstudiante());
-            data.put("rol", "estudiante");
-            data.put("ci", estudiante.get().getCi());
-            data.put("correoInstitucional", estudiante.get().getCorreoInstitucional());
-            data.put("nombre", estudiante.get().getNombre());
-            data.put("apellido", estudiante.get().getApellido());
-            data.put("telefono", estudiante.get().getTelefono());
+                    Map<String, Object> data = new HashMap<>();
+                    data.put("id_estudiante", foundEstudiante.getIdEstudiante());
+                    data.put("rol", "estudiante");
+                    data.put("ci", estudiante.get().getCi());
+                    data.put("correoInstitucional", estudiante.get().getCorreoInstitucional());
+                    data.put("nombre", estudiante.get().getNombre());
+                    data.put("apellido", estudiante.get().getApellido());
+                    data.put("telefono", estudiante.get().getTelefono());
 
-            SuccessfulResponse response = new SuccessfulResponse(
-                    "200 OK",
-                    "Inicio de sesión correcto",
-                    token,
-                    60,
-                    data
-            );
-            return ResponseEntity.ok(response);
-        } else {
-            UnsuccessfulResponse response = new UnsuccessfulResponse(
-                "401 Unauthorized",
-                "Credenciales incorrectas",
-                "/estudiante/login"
-            );
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+                    SuccessfulResponse response = new SuccessfulResponse(
+                            "200 OK",
+                            "Inicio de sesión correcto",
+                            token,
+                            60,
+                            data
+                    );
+                    return ResponseEntity.ok(response);
+                } else {
+                    UnsuccessfulResponse response = new UnsuccessfulResponse(
+                        "401 Unauthorized",
+                        "Credenciales incorrectas",
+                        "/estudiante/login"
+                    );
+                    return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+                }
+            } catch (Exception e) {
+                return new ResponseEntity<>(new LoginResponse(e.getMessage()), HttpStatus.INTERNAL_SERVER_ERROR);
+            }
         }
-    } catch (Exception e) {
-        return new ResponseEntity<>(new LoginResponse(e.getMessage()), HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-}
-*/
+        */
 
     @PostMapping("/enviarEnlace")
     public ResponseEntity<?> enviarEnlaceCertificado() {
@@ -379,20 +378,20 @@ public ResponseEntity<?> getOpcionesFiltro() {
         return ResponseEntity.ok(estudianteExistente);
     }
 
-    @GetMapping("/countByGeneroAndAnio")
-    public ResponseEntity<?> countByGeneroAndAnio(@RequestParam(required = false) Integer anio) {
-        List<Object[]> results = estudianteService.getEstudiantesCompletaronEncuestaByGeneroAndAnio(anio);
-        return ResponseEntity.ok(results);
-    }    
+        @GetMapping("/countByGeneroAndAnio")
+        public ResponseEntity<?> countByGeneroAndAnio(@RequestParam(required = false) Integer anio) {
+            List<Object[]> results = estudianteService.getEstudiantesCompletaronEncuestaByGeneroAndAnio(anio);
+            return ResponseEntity.ok(results);
+        }
     //filtrpo de anio en estado_encuesta para el reportes de dashboard
     @GetMapping("/anios_unicos")
-    public ResponseEntity<List<Integer>> getUniqueYears() {
-        List<Integer> uniqueYears = estudianteService.findUniqueYears();
-        return ResponseEntity.ok(uniqueYears);
-    }
+        public ResponseEntity<List<Integer>> getUniqueYears() {
+            List<Integer> uniqueYears = estudianteService.findUniqueYears();
+            return ResponseEntity.ok(uniqueYears);
+        }
 
     @GetMapping("/por-carrera")
-public ResponseEntity<?> getEstudiantesPorCarrera(
+        public ResponseEntity<?> getEstudiantesPorCarrera(
         @RequestParam String carrera,
         @RequestParam(required = false) String estadoCertificado,
         @RequestParam(required = false) String estadoEncuesta,
@@ -437,11 +436,6 @@ public ResponseEntity<?> getEstudiantesPorCarrera(
     } catch (Exception e) {
         e.printStackTrace();
         return new ResponseEntity<>(new MessageResponse(e.getMessage()), HttpStatus.INTERNAL_SERVER_ERROR);
-
-
     }
   }
-    
-
-
 }
