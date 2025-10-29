@@ -1,12 +1,11 @@
 package com.usei.usei.models;
 
 import jakarta.persistence.*;
-import java.io.Serializable;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "log_usuario")
-public class LogUsuario implements Serializable {
+@Table(name = "Log_Usuario") // respeta el nombre exacto de la tabla
+public class LogUsuario {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -19,25 +18,29 @@ public class LogUsuario implements Serializable {
     @Column(name = "motivo", length = 150, nullable = false)
     private String motivo;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "Usuario_id_usuario", nullable = false)
-    private Usuario usuarioIdUsuario;
+    // FK -> Usuario.id_usuario
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "Usuario_id_usuario", referencedColumnName = "id_usuario")
+    private Usuario usuario;
 
     public LogUsuario() {}
 
-    public LogUsuario(LocalDateTime fechaLog, String motivo, Usuario usuario) {
-        this.fechaLog = fechaLog;
+    public LogUsuario(Usuario usuario, String motivo, LocalDateTime fechaLog) {
+        this.usuario = usuario;
         this.motivo = motivo;
-        this.usuarioIdUsuario = usuario;
+        this.fechaLog = fechaLog;
     }
 
+    // getters & setters
     public Long getIdLog() { return idLog; }
-    public LocalDateTime getFechaLog() { return fechaLog; }
-    public String getMotivo() { return motivo; }
-    public Usuario getUsuarioIdUsuario() { return usuarioIdUsuario; }
-
     public void setIdLog(Long idLog) { this.idLog = idLog; }
+
+    public LocalDateTime getFechaLog() { return fechaLog; }
     public void setFechaLog(LocalDateTime fechaLog) { this.fechaLog = fechaLog; }
+
+    public String getMotivo() { return motivo; }
     public void setMotivo(String motivo) { this.motivo = motivo; }
-    public void setUsuarioIdUsuario(Usuario usuarioIdUsuario) { this.usuarioIdUsuario = usuarioIdUsuario; }
+
+    public Usuario getUsuario() { return usuario; }
+    public void setUsuario(Usuario usuario) { this.usuario = usuario; }
 }
