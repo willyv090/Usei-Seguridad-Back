@@ -9,6 +9,9 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Business logic implementation for managing security configuration
+ */
 @Service
 public class ConfiguracionSeguridadBL implements ConfiguracionSeguridadService {
 
@@ -43,9 +46,9 @@ public class ConfiguracionSeguridadBL implements ConfiguracionSeguridadService {
 
         ConfiguracionSeguridad saved = configuracionDAO.save(newConfig);
 
-        System.out.println("Security configuration updated successfully!");
-        System.out.println("New configuration ID: " + saved.getIdConfig());
-        System.out.println("Users will be forced to update passwords on next login based on new policies.");
+        System.out.println("✅ Security configuration updated successfully!");
+        System.out.println("✅ New configuration ID: " + saved.getIdConfig());
+        System.out.println("✅ Users will be forced to update passwords on next login based on new policies.");
 
         return saved;
     }
@@ -68,27 +71,51 @@ public class ConfiguracionSeguridadBL implements ConfiguracionSeguridadService {
         return configuracionDAO.existsActiveConfiguration();
     }
 
+    /**
+     * Get the current configuration or create a default one if none exists
+     * This ensures the system always has a valid configuration
+     */
     @Transactional
     public ConfiguracionSeguridad getCurrentConfigurationOrDefault() {
         Optional<ConfiguracionSeguridad> config = getActiveConfiguration();
-        
+
         if (config.isPresent()) {
             return config.get();
         }
 
         // Create default configuration if none exists
         ConfiguracionSeguridad defaultConfig = new ConfiguracionSeguridad(
-            12,    // min password length
-            3,     // max login attempts
-            60,    // password expiry days  
-            12,    // months no reuse
-            true,  // require uppercase
-            true,  // require lowercase
-            true,  // require numbers
-            true,  // require symbols
-            1L     // system user
+                12,    // min password length
+                3,     // max login attempts
+                60,    // password expiry days
+                12,    // months no reuse
+                true,  // require uppercase
+                true,  // require lowercase
+                true,  // require numbers
+                true,  // require symbols
+                1L     // system user
         );
 
         return configuracionDAO.save(defaultConfig);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ConfiguracionSeguridad obtenerConfiguracionPorId(Long id) {
+        Optional<ConfiguracionSeguridad> config = configuracionDAO.findById(id);
+        return config.orElse(null);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ConfiguracionSeguridad obtenerConfiguracionActiva() {
+        Optional<ConfiguracionSeguridad> config = configuracionDAO.findActiveConfiguration();
+        return config.orElse(null);
+    }
+
+    @Override
+    @Transactional
+    public void eliminarConfiguracion(Long id) {
+        configuracionDAO.deleteById(id);
     }
 }
