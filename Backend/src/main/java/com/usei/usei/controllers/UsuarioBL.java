@@ -2,6 +2,7 @@ package com.usei.usei.controllers;
 
 import java.io.File;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.security.SecureRandom;
 
@@ -26,6 +27,8 @@ import com.usei.usei.repositories.LogUsuarioDAO;
 
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class UsuarioBL implements UsuarioService {
@@ -36,6 +39,8 @@ public class UsuarioBL implements UsuarioService {
     private final JavaMailSender mailSender;
     private final PasswordEncoder passwordEncoder; // BCrypt
     private String codigoVerificacion;
+    @Autowired
+    private LogUsuarioService logUsuarioService;
     @Autowired
     private LogUsuarioDAO logUsuarioDAO;
 
@@ -136,17 +141,28 @@ public class UsuarioBL implements UsuarioService {
         return usuarioDAO.save(usuario);
     }
 
+    // Eliminar usuario por ID
     @Override
     @Transactional
     public void deleteById(Long id) {
-        Optional<Usuario> oUsuario = usuarioDAO.findById(id);
-        if (oUsuario.isPresent()) {
-            usuarioDAO.deleteById(id);
-            registrarLog(oUsuario.get(), "Eliminación de usuario");
-        } else {
-            throw new RuntimeException("Usuario no encontrado para eliminar");
+        Usuario usuario = usuarioDAO.findById(id)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado para eliminar"));
+
+        Usuario dummyUser = usuarioDAO.findById(1L)
+                .orElseThrow(() -> new RuntimeException("No existe usuario sistema (id=1) para reasignar logs"));
+
+        List<LogUsuario> logs = logUsuarioDAO.findByUsuario(usuario);
+        for (LogUsuario log : logs) {
+            log.setUsuario(dummyUser);
         }
+        logUsuarioDAO.saveAll(logs);
+        registrarLog(dummyUser, "Eliminación del usuario: " + usuario.getNombre() + " " + usuario.getApellido());
+        usuarioDAO.delete(usuario);
+
+        System.out.println("✅ Usuario eliminado correctamente y logs reasignados a usuario sistema.");
     }
+
+
 
     @Override
     @Transactional
@@ -401,17 +417,29 @@ public class UsuarioBL implements UsuarioService {
     }
 
     //Metodo auxiliar para el manejo de logs en abm usuario
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     private void registrarLog(Usuario usuario, String motivo) {
         try {
+            if (usuario == null) {
+                System.err.println("No se puede registrar log: usuario es null.");
+                return;
+            }
+
+            // Crear registro de log
             LogUsuario log = new LogUsuario(
-                    java.time.LocalDateTime.now(),
+                    usuario,
                     motivo,
-                    usuario
+                    java.time.LocalDateTime.now()
             );
+
             logUsuarioDAO.save(log);
+            System.out.println("Log registrado correctamente: " + motivo + " (Usuario ID: " + usuario.getIdUsuario() + ")");
+
         } catch (Exception e) {
             System.err.println("Error al registrar log de usuario: " + e.getMessage());
+            e.printStackTrace();
         }
     }
+
 
 }

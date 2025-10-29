@@ -6,6 +6,7 @@ import java.time.LocalDate;
 
 @Entity
 @Table(name = "contrasenia")
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Contrasenia {
 
     @Id
@@ -63,10 +64,4 @@ public class Contrasenia {
 
     public LocalDate getUltimoLog() { return ultimoLog; }
     public void setUltimoLog(LocalDate ultimoLog) { this.ultimoLog = ultimoLog; }
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "Contrasenia_id_pass", referencedColumnName = "id_pass", nullable = false)
-    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
-    private Contrasenia contraseniaEntity;
-
 }

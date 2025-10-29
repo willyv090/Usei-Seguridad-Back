@@ -576,7 +576,7 @@ ALTER TABLE Log_Usuario ADD CONSTRAINT Log_Usuario_Usuario
     NOT DEFERRABLE
     INITIALLY IMMEDIATE;
 
-
+ALTER TABLE Contrasenia DROP COLUMN IF EXISTS contrasenia_id_pass;
 
 -- End of file.
 
