@@ -28,6 +28,9 @@ public class AuthAPI {
     private TokenGenerator tokenGenerator;
     @Autowired
     private CaptchaService captchaService;
+    @Autowired
+    private com.usei.usei.controllers.AuditBL auditBL;
+
 
     // banderas de configuración para el captcha
     @Value("${security.captcha.enabled:true}")
@@ -206,6 +209,19 @@ public class AuthAPI {
                     60
                 );
             }
+            // >>> Registrar LOG de login exitoso (solo cuando realmente hay sesión)
+            try {
+                if ("usuario".equalsIgnoreCase(tipo)) {
+                    Long idUsuario = Long.valueOf(String.valueOf(data.get("id_usuario")));
+                    auditBL.registerLogin(idUsuario);
+                }
+                // Si luego quieres también para estudiante y tienes el id_usuario equivalente, lo pones aquí.
+            } catch (Exception auditEx) {
+                // No interrumpir la sesión si falla la auditoría
+                auditEx.printStackTrace();
+            }
+
+
 
             //Agregar accesos dentro de data
             if (!data.containsKey("accesos") && accesos != null) {
