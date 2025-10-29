@@ -21,6 +21,8 @@ import com.usei.usei.repositories.ContraseniaDAO;
 import com.usei.usei.repositories.RolDAO;
 import com.usei.usei.repositories.UsuarioDAO;
 import com.usei.usei.util.PasswordPolicyUtil;
+import com.usei.usei.models.LogUsuario;
+import com.usei.usei.repositories.LogUsuarioDAO;
 
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
@@ -34,6 +36,8 @@ public class UsuarioBL implements UsuarioService {
     private final JavaMailSender mailSender;
     private final PasswordEncoder passwordEncoder; // BCrypt
     private String codigoVerificacion;
+    @Autowired
+    private LogUsuarioDAO logUsuarioDAO;
 
     @Autowired
     public UsuarioBL(UsuarioDAO usuarioDAO,
@@ -78,7 +82,7 @@ public class UsuarioBL implements UsuarioService {
                     nullSafe(usuario.getNombre()), nullSafe(usuario.getApellido()), nullSafe(usuario.getCi())
             );
 
-            // Hash (nunca guardes texto plano)
+            // Hash (temporal)
             String hash = passwordEncoder.encode(contraseniaGenerada);
 
             // Crear entidad Contrasenia con política
@@ -124,14 +128,25 @@ public class UsuarioBL implements UsuarioService {
                     System.err.println("Error al enviar correo a " + usuario.getCorreo() + ": " + e.getMessage());
                 }
             }
-        }
+            Usuario saved = usuarioDAO.save(usuario);
+            registrarLog(saved, "Creación de usuario");
+            return saved;
 
+        }
         return usuarioDAO.save(usuario);
     }
 
     @Override
     @Transactional
-    public void deleteById(Long id) { usuarioDAO.deleteById(id); }
+    public void deleteById(Long id) {
+        Optional<Usuario> oUsuario = usuarioDAO.findById(id);
+        if (oUsuario.isPresent()) {
+            usuarioDAO.deleteById(id);
+            registrarLog(oUsuario.get(), "Eliminación de usuario");
+        } else {
+            throw new RuntimeException("Usuario no encontrado para eliminar");
+        }
+    }
 
     @Override
     @Transactional
@@ -150,8 +165,10 @@ public class UsuarioBL implements UsuarioService {
             u.setRolEntity(usuario.getRolEntity());
             u.setRol(usuario.getRolEntity().getNombreRol());
         }
+        Usuario updated = usuarioDAO.save(u);
+        registrarLog(updated, "Actualización de usuario");
+        return updated;
 
-        return usuarioDAO.save(u);
     }
 
     /* ==========================
@@ -382,4 +399,19 @@ public class UsuarioBL implements UsuarioService {
         // String inicialApellido = apellido.isEmpty() ? "" : apellido.substring(0,1).toUpperCase();
         // return inicialNombre + inicialApellido + ci;
     }
+
+    //Metodo auxiliar para el manejo de logs en abm usuario
+    private void registrarLog(Usuario usuario, String motivo) {
+        try {
+            LogUsuario log = new LogUsuario(
+                    java.time.LocalDateTime.now(),
+                    motivo,
+                    usuario
+            );
+            logUsuarioDAO.save(log);
+        } catch (Exception e) {
+            System.err.println("Error al registrar log de usuario: " + e.getMessage());
+        }
+    }
+
 }
