@@ -5,7 +5,6 @@ public class TokenObject {
 
     public TokenObject() {
     }
-
     public TokenObject(String token) {
         this.token = token;
     }

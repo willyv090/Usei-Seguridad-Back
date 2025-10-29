@@ -35,27 +35,27 @@ public class PasswordPolicyUtil {
      */
     public boolean cumplePolitica(String plain) {
         ConfiguracionSeguridad config = getCurrentConfig();
-        
+
         if (plain == null || plain.length() < config.getMinLongitudContrasenia()) {
             return false;
         }
-        
+
         if (config.isRequerirMayusculas() && !UPPER.matcher(plain).find()) {
             return false;
         }
-        
+
         if (config.isRequerirMinusculas() && !LOWER.matcher(plain).find()) {
             return false;
         }
-        
+
         if (config.isRequerirNumeros() && !DIGIT.matcher(plain).find()) {
             return false;
         }
-        
+
         if (config.isRequerirSimbolos() && !SPECIAL.matcher(plain).find()) {
             return false;
         }
-        
+
         return true;
     }
 
@@ -93,12 +93,12 @@ public class PasswordPolicyUtil {
     public int getComplejidad() {
         ConfiguracionSeguridad config = getCurrentConfig();
         int complejidad = 0;
-        
+
         if (config.isRequerirMayusculas()) complejidad++;
         if (config.isRequerirMinusculas()) complejidad++;
         if (config.isRequerirNumeros()) complejidad++;
         if (config.isRequerirSimbolos()) complejidad++;
-        
+
         return complejidad;
     }
 
@@ -109,25 +109,25 @@ public class PasswordPolicyUtil {
         if (password == null || password.isEmpty()) {
             return 0;
         }
-        
+
         int complexity = 0;
-        
+
         if (UPPER.matcher(password).find()) {
             complexity++; // Has uppercase
         }
-        
+
         if (LOWER.matcher(password).find()) {
             complexity++; // Has lowercase
         }
-        
+
         if (DIGIT.matcher(password).find()) {
             complexity++; // Has digits
         }
-        
+
         if (SPECIAL.matcher(password).find()) {
             complexity++; // Has special characters
         }
-        
+
         return complexity;
     }
 
@@ -148,23 +148,23 @@ public class PasswordPolicyUtil {
      */
     private ConfiguracionSeguridad createDefaultConfig() {
         return new ConfiguracionSeguridad(
-            DEFAULT_MIN_LENGTH,
-            DEFAULT_MAX_INTENTOS, 
-            DEFAULT_EXPIRA_DIAS,
-            DEFAULT_NO_REUSE_MESES,
-            true, // require uppercase
-            true, // require lowercase
-            true, // require numbers
-            true, // require symbols
-            1L    // system user
+                DEFAULT_MIN_LENGTH,
+                DEFAULT_MAX_INTENTOS,
+                DEFAULT_EXPIRA_DIAS,
+                DEFAULT_NO_REUSE_MESES,
+                true, // require uppercase
+                true, // require lowercase
+                true, // require numbers
+                true, // require symbols
+                1L    // system user
         );
     }
 
     // Static methods for backward compatibility (deprecated - use instance methods)
-    
+
     @Deprecated
     public static final int MIN_LENGTH = DEFAULT_MIN_LENGTH;
-    @Deprecated 
+    @Deprecated
     public static final int COMPLEJIDAD = DEFAULT_COMPLEJIDAD;
     @Deprecated
     public static final int MAX_INTENTOS = DEFAULT_MAX_INTENTOS;
@@ -183,24 +183,24 @@ public class PasswordPolicyUtil {
             System.out.println("❌ POLICY CHECK: Password is null - forcing update");
             return false;
         }
-        
+
         ConfiguracionSeguridad config = getCurrentConfig();
         System.out.println("🔒 === POLICY COMPLIANCE CHECK ===");
-        
+
         // CORE LOGIC: If password was created before policy was last modified, force update
         java.time.LocalDate passwordCreated = contrasenia.getFechaCreacion();
         java.time.LocalDateTime policyModified = config.getFechaModificacion();
-        
+
         System.out.println("🔒 Password created on: " + passwordCreated);
         System.out.println("🔒 Policy last modified: " + policyModified);
-        
+
         if (passwordCreated != null && policyModified != null) {
             // Get policy modification date (without time) for comparison
             java.time.LocalDate policyModifiedDate = policyModified.toLocalDate();
-            
+
             System.out.println("🔒 Password created date: " + passwordCreated);
             System.out.println("🔒 Policy modified date: " + policyModifiedDate);
-            
+
             // ⭐ KEY LOGIC: If password was created BEFORE the policy was modified, force update
             if (passwordCreated.isBefore(policyModifiedDate)) {
                 System.out.println("❌ POLICY ENFORCEMENT: Password created BEFORE policy update!");
@@ -208,20 +208,20 @@ public class PasswordPolicyUtil {
                 System.out.println("❌ FORCING PASSWORD CHANGE - Security policies have been updated");
                 return false;
             }
-            
+
             // ⭐ FIX: For same-day cases, be more intelligent about timing
             if (passwordCreated.isEqual(policyModifiedDate)) {
                 System.out.println("🔒 Password and policy both from same date: " + passwordCreated);
-                
+
                 // Check if password was created AFTER policy modification time
                 java.time.LocalDateTime passwordDateTime = passwordCreated.atStartOfDay();
-                
+
                 // If policy was modified today, check if password was updated AFTER the policy change
                 // For this, we need to check the actual time, but since password only stores date,
                 // we'll be conservative: allow login if password was created on or after policy date
                 if (passwordCreated.isAfter(policyModifiedDate) || passwordCreated.isEqual(policyModifiedDate)) {
                     System.out.println("✅ Password created on or after policy update date - checking compliance");
-                    
+
                     // Additional validation: ensure password meets current requirements
                     if (passwordMeetsCurrentRequirements(contrasenia, config)) {
                         System.out.println("✅ Password meets all current requirements - allowing login");
@@ -250,18 +250,18 @@ public class PasswordPolicyUtil {
             System.out.println("❌ Password too short: " + contrasenia.getLongitud() + " < " + config.getMinLongitudContrasenia());
             return false;
         }
-        
+
         // Check complexity requirements
         int currentComplexity = contrasenia.getComplejidad();
         int requiredComplexity = getComplejidad();
-        
+
         System.out.println("🔒 Password complexity: " + currentComplexity + ", Required: " + requiredComplexity);
-        
+
         if (currentComplexity < requiredComplexity) {
             System.out.println("❌ Password complexity insufficient: " + currentComplexity + " < " + requiredComplexity);
             return false;
         }
-        
+
         return true;
     }
 }

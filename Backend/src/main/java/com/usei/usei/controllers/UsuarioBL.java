@@ -2,6 +2,7 @@ package com.usei.usei.controllers;
 
 import java.io.File;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.security.SecureRandom;
 
@@ -21,9 +22,13 @@ import com.usei.usei.repositories.ContraseniaDAO;
 import com.usei.usei.repositories.RolDAO;
 import com.usei.usei.repositories.UsuarioDAO;
 import com.usei.usei.util.PasswordPolicyUtil;
+import com.usei.usei.models.LogUsuario;
+import com.usei.usei.repositories.LogUsuarioDAO;
 
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class UsuarioBL implements UsuarioService {
@@ -34,6 +39,10 @@ public class UsuarioBL implements UsuarioService {
     private final JavaMailSender mailSender;
     private final PasswordEncoder passwordEncoder; // BCrypt
     private String codigoVerificacion;
+    @Autowired
+    private LogUsuarioService logUsuarioService;
+    @Autowired
+    private LogUsuarioDAO logUsuarioDAO;
 
     @Autowired
     public UsuarioBL(UsuarioDAO usuarioDAO,
@@ -78,7 +87,7 @@ public class UsuarioBL implements UsuarioService {
                     nullSafe(usuario.getNombre()), nullSafe(usuario.getApellido()), nullSafe(usuario.getCi())
             );
 
-            // Hash (nunca guardes texto plano)
+            // Hash (temporal)
             String hash = passwordEncoder.encode(contraseniaGenerada);
 
             // Crear entidad Contrasenia con política
@@ -124,14 +133,36 @@ public class UsuarioBL implements UsuarioService {
                     System.err.println("Error al enviar correo a " + usuario.getCorreo() + ": " + e.getMessage());
                 }
             }
-        }
+            Usuario saved = usuarioDAO.save(usuario);
+            registrarLog(saved, "Creación de usuario");
+            return saved;
 
+        }
         return usuarioDAO.save(usuario);
     }
 
+    // Eliminar usuario por ID
     @Override
     @Transactional
-    public void deleteById(Long id) { usuarioDAO.deleteById(id); }
+    public void deleteById(Long id) {
+        Usuario usuario = usuarioDAO.findById(id)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado para eliminar"));
+
+        Usuario dummyUser = usuarioDAO.findById(1L)
+                .orElseThrow(() -> new RuntimeException("No existe usuario sistema (id=1) para reasignar logs"));
+
+        List<LogUsuario> logs = logUsuarioDAO.findByUsuario(usuario);
+        for (LogUsuario log : logs) {
+            log.setUsuario(dummyUser);
+        }
+        logUsuarioDAO.saveAll(logs);
+        registrarLog(dummyUser, "Eliminación del usuario: " + usuario.getNombre() + " " + usuario.getApellido());
+        usuarioDAO.delete(usuario);
+
+        System.out.println("✅ Usuario eliminado correctamente y logs reasignados a usuario sistema.");
+    }
+
+
 
     @Override
     @Transactional
@@ -150,8 +181,10 @@ public class UsuarioBL implements UsuarioService {
             u.setRolEntity(usuario.getRolEntity());
             u.setRol(usuario.getRolEntity().getNombreRol());
         }
+        Usuario updated = usuarioDAO.save(u);
+        registrarLog(updated, "Actualización de usuario");
+        return updated;
 
-        return usuarioDAO.save(u);
     }
 
     /* ==========================
@@ -382,4 +415,31 @@ public class UsuarioBL implements UsuarioService {
         // String inicialApellido = apellido.isEmpty() ? "" : apellido.substring(0,1).toUpperCase();
         // return inicialNombre + inicialApellido + ci;
     }
+
+    //Metodo auxiliar para el manejo de logs en abm usuario
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    private void registrarLog(Usuario usuario, String motivo) {
+        try {
+            if (usuario == null) {
+                System.err.println("No se puede registrar log: usuario es null.");
+                return;
+            }
+
+            // Crear registro de log
+            LogUsuario log = new LogUsuario(
+                    usuario,
+                    motivo,
+                    java.time.LocalDateTime.now()
+            );
+
+            logUsuarioDAO.save(log);
+            System.out.println("Log registrado correctamente: " + motivo + " (Usuario ID: " + usuario.getIdUsuario() + ")");
+
+        } catch (Exception e) {
+            System.err.println("Error al registrar log de usuario: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+
 }

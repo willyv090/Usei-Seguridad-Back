@@ -78,22 +78,22 @@ public class ConfiguracionSeguridadBL implements ConfiguracionSeguridadService {
     @Transactional
     public ConfiguracionSeguridad getCurrentConfigurationOrDefault() {
         Optional<ConfiguracionSeguridad> config = getActiveConfiguration();
-        
+
         if (config.isPresent()) {
             return config.get();
         }
 
         // Create default configuration if none exists
         ConfiguracionSeguridad defaultConfig = new ConfiguracionSeguridad(
-            12,    // min password length
-            3,     // max login attempts
-            60,    // password expiry days  
-            12,    // months no reuse
-            true,  // require uppercase
-            true,  // require lowercase
-            true,  // require numbers
-            true,  // require symbols
-            1L     // system user
+                12,    // min password length
+                3,     // max login attempts
+                60,    // password expiry days
+                12,    // months no reuse
+                true,  // require uppercase
+                true,  // require lowercase
+                true,  // require numbers
+                true,  // require symbols
+                1L     // system user
         );
 
         return configuracionDAO.save(defaultConfig);

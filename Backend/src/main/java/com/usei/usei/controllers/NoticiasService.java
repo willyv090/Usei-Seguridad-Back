@@ -12,7 +12,6 @@ import org.springframework.data.domain.Pageable;
 public interface NoticiasService {
 
     public Iterable<Noticias> findAll();
-
     public Optional<Noticias> findById(Long id);
 
     public Noticias save(Noticias newNoticias);

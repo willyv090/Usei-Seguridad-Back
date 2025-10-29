@@ -23,9 +23,7 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
 
         String path = request.getRequestURI();
 
-        // ============================================
         // RUTAS PÚBLICAS (SIN TOKEN REQUERIDO)
-        // ============================================
         
         // Login y recuperación de contraseña
         if (path.equals("/auth/login") || 
@@ -34,7 +32,7 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
             return true;
         }
 
-        // ⭐ MÓDULO DE SEGURIDAD (ACCESO SIN TOKEN)
+        // MÓDULO DE SEGURIDAD (ACCESO SIN TOKEN)
         if (path.startsWith("/usuario") || 
             path.startsWith("/rol")) {
             return true; // Permite acceso sin validar token
@@ -47,9 +45,7 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
             return true;
         }
 
-        // ============================================
         // VALIDACIÓN DE TOKEN PARA OTROS MÓDULOS
-        // ============================================
         
         String authHeader = request.getHeader("Authorization");
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {

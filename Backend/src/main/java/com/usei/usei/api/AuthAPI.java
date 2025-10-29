@@ -24,20 +24,20 @@ public class AuthAPI {
 
     @Autowired
     private AuthenticationService authService;
-    
     @Autowired
     private TokenGenerator tokenGenerator;
-
     @Autowired
     private CaptchaService captchaService;
+    @Autowired
+    private com.usei.usei.controllers.AuditBL auditBL;
 
-    // ======== NUEVO: banderas de configuración para el captcha ========
+
+    // banderas de configuración para el captcha
     @Value("${security.captcha.enabled:true}")
     private boolean captchaEnabled; // si es false, se salta toda la validación
 
     @Value("${security.captcha.dev-bypass-token:}")
     private String captchaDevBypassToken; // si coincide con el token recibido, considera válido
-    // ==================================================================
 
     /**
      * Endpoint unificado de login para Usuario y Estudiante
@@ -46,7 +46,7 @@ public class AuthAPI {
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody UnifiedLoginRequest request) {
         try {
-            // ============== CAPTCHA (con control por config y bypass) ==============
+            // CAPTCHA (con control por config y bypass)
             if (captchaEnabled) {
                 // 1) Debe venir token
                 if (request.getCaptchaToken() == null || request.getCaptchaToken().isEmpty()) {
@@ -75,7 +75,6 @@ public class AuthAPI {
                     );
                 }
             }
-            // ======================================================================
 
             // Validar que vengan los datos requeridos
             if (request.getCorreo() == null || request.getCorreo().trim().isEmpty()) {
@@ -106,7 +105,7 @@ public class AuthAPI {
             
             Boolean success = (Boolean) authResult.get("success");
             
-            // Si falla la autenticación (tu lógica intacta)
+            // Si falla la autenticación
             if (!success) {
                 String message = (String) authResult.get("message");
                 Boolean expired = (Boolean) authResult.getOrDefault("expired", false);
@@ -137,7 +136,7 @@ public class AuthAPI {
                     "/auth/login"
                 );
                 
-                // Caso especial: política actualizada -> mapa con info adicional (tu lógica intacta)
+                // En casos especiales: política actualizada (mapa con info adicional)
                 if (politicaActualizada) {
                     Map<String, Object> policyResponse = new HashMap<>();
                     policyResponse.put("timeStamp", response.getTimeStamp());
@@ -152,17 +151,15 @@ public class AuthAPI {
                 return ResponseEntity.status(status).body(response);
             }
             
-            // Login exitoso (tu lógica existente)
+            // Login exitoso
             String tipo = (String) authResult.get("tipo");
             @SuppressWarnings("unchecked")
             Map<String, Object> data = (Map<String, Object>) authResult.get("data"); 
             @SuppressWarnings("unchecked")
             List<String> accesos = (List<String>) authResult.get("accesos");
 
-            // =========================
-            // 👇 **NUEVO: PRIMER LOGIN**
-            // =========================
-            // Si es 'usuario' y el flag 'cambio_contrasenia' viene en true -> forzar cambio de contraseña
+            // Primer login (se logea por primera vez)
+            // Si es 'usuario' y el flag 'cambio_contrasenia' viene en true se debe forzar cambio de contraseña
             boolean requireFirstChange = false;
             if ("usuario".equalsIgnoreCase(tipo) && data != null) {
                 Object changeFlag = data.get("cambio_contrasenia");
@@ -177,21 +174,18 @@ public class AuthAPI {
                 payload.put("reason", "FIRST_LOGIN_PASSWORD_CHANGE_REQUIRED");
                 payload.put("message", "Debe cambiar su contraseña (primer ingreso).");
                 payload.put("redirect", "/usuario/change-password");
-                // datos útiles para el front
+                // datos para mandar al front
                 payload.put("id_usuario", data.get("id_usuario"));
                 payload.put("correo", data.get("correo"));
                 payload.put("carrera", data.get("carrera"));
                 payload.put("nombre", data.get("nombre"));
                 payload.put("ci", data.get("ci"));
                 payload.put("cambio_contrasenia", true);
-                // Nota: no generamos token hasta que cambie la contraseña
+                // no generamos token hasta que cambie la contraseña
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body(payload);
             }
-            // =========================
-            // 👆 **FIN PRIMER LOGIN**
-            // =========================
 
-            // Generar token normal (tu lógica intacta)
+            // Generar token normal
             String token = "";
             if ("usuario".equals(tipo)) {
                 String idUsuario = String.valueOf(data.get("id_usuario"));
@@ -215,8 +209,21 @@ public class AuthAPI {
                     60
                 );
             }
+            // >>> Registrar LOG de login exitoso (solo cuando realmente hay sesión)
+            try {
+                if ("usuario".equalsIgnoreCase(tipo)) {
+                    Long idUsuario = Long.valueOf(String.valueOf(data.get("id_usuario")));
+                    auditBL.registerLogin(idUsuario);
+                }
+                // Si luego quieres también para estudiante y tienes el id_usuario equivalente, lo pones aquí.
+            } catch (Exception auditEx) {
+                // No interrumpir la sesión si falla la auditoría
+                auditEx.printStackTrace();
+            }
 
-            //Agregar accesos dentro de data (tu lógica intacta)
+
+
+            //Agregar accesos dentro de data
             if (!data.containsKey("accesos") && accesos != null) {
                 data.put("accesos", accesos);
             }
@@ -243,5 +250,4 @@ public class AuthAPI {
                 ));
         }
     }
-
 }

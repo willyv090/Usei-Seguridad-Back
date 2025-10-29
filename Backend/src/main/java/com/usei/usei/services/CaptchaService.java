@@ -13,11 +13,6 @@ public class CaptchaService {
     private static final String SECRET_KEY = "6LfqqPMrAAAAAO2W80T-sgn-W22Sw050AgNusVRh"; // 🔑 Tu clave secreta
     private static final String VERIFY_URL = "https://www.google.com/recaptcha/api/siteverify";
 
-    /**
-     * Verifica el token de reCAPTCHA con la API de Google.
-     * @param token Token recibido desde el frontend
-     * @return true si es válido, false si no lo es
-     */
     public boolean verifyCaptcha(String token) {
         try {
             RestTemplate restTemplate = new RestTemplate();

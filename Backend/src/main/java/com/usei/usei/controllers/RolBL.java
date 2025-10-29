@@ -31,7 +31,7 @@ public class RolBL {
             );
         }
 
-        // Evitar duplicados (case-insensitive)
+        // Evitar duplicados
         if (rolDAO.existsByNombreRolIgnoreCase(normalizado)) {
             throw new RuntimeException("Ya existe un rol con el nombre " + capitalizar(normalizado));
         }
@@ -57,7 +57,7 @@ public class RolBL {
             );
         }
 
-        // 🔹 Validar duplicado solo si el nombre cambió
+        // Validar duplicado solo si el nombre se edito
         if (!existente.getNombreRol().equalsIgnoreCase(normalizado)
                 && rolDAO.existsByNombreRolIgnoreCase(normalizado)) {
             throw new RuntimeException("Ya existe un rol con el nombre " + capitalizar(normalizado));

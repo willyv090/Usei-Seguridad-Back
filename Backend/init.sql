@@ -187,7 +187,14 @@ CREATE TABLE H_Usuario (
     tx_user int  NOT NULL,
     CONSTRAINT H_Usuario_pk PRIMARY KEY (id_usuario)
 );
-
+-- Table: Log_Usuario
+CREATE TABLE Log_Usuario (
+    id_log serial  NOT NULL,
+    fecha_log timestamp  NOT NULL,
+    motivo varchar(150)  NOT NULL,
+    Usuario_id_usuario int  NOT NULL,
+    CONSTRAINT Log_Usuario_pk PRIMARY KEY (id_log)
+);
 -- Table: Noticias
 CREATE TABLE Noticias (
     id_noticia serial  NOT NULL,
@@ -319,6 +326,20 @@ CREATE TABLE Usuario (
     CONSTRAINT Usuario_pk PRIMARY KEY (id_usuario)
 );
 
+-- Table: Log_Usuario
+CREATE TABLE Log_Usuario (
+    id_log serial NOT NULL,
+    fecha_log timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    motivo varchar(150) NOT NULL,
+    Usuario_id_usuario int NOT NULL,
+    CONSTRAINT Log_Usuario_pk PRIMARY KEY (id_log)
+);
+
+--Esto acelera las búsquedas por usuario
+CREATE INDEX idx_log_usuario_user
+ON Log_Usuario (Usuario_id_usuario);
+
+
 -- Table: ConfiguracionSeguridad - Configurable security policies for Security role users
 CREATE TABLE configuracion_seguridad (
     id_config serial  NOT NULL,
@@ -384,7 +405,13 @@ ALTER TABLE Estado_Certificado ADD CONSTRAINT Estado_Certificado_Certificado
     NOT DEFERRABLE
     INITIALLY IMMEDIATE
 ;
-
+-- Reference: Log_Usuario_Usuario (table: Log_Usuario)
+ALTER TABLE Log_Usuario ADD CONSTRAINT Log_Usuario_Usuario
+    FOREIGN KEY (Usuario_id_usuario)
+    REFERENCES Usuario (id_usuario)  
+    NOT DEFERRABLE 
+    INITIALLY IMMEDIATE
+;
 -- Reference: Estado_Certificado_Estudiante (table: Estado_Certificado)
 ALTER TABLE Estado_Certificado ADD CONSTRAINT Estado_Certificado_Estudiante
     FOREIGN KEY (Estudiante_id_estudiante)
@@ -542,6 +569,14 @@ INSERT INTO configuracion_seguridad (
     true   -- Configuration is active
 );
 
+-- Reference: Log_Usuario_Usuario (table: Log_Usuario)
+ALTER TABLE Log_Usuario ADD CONSTRAINT Log_Usuario_Usuario
+    FOREIGN KEY (Usuario_id_usuario)
+    REFERENCES Usuario (id_usuario)
+    NOT DEFERRABLE
+    INITIALLY IMMEDIATE;
+
+ALTER TABLE Contrasenia DROP COLUMN IF EXISTS contrasenia_id_pass;
 
 -- End of file.
 

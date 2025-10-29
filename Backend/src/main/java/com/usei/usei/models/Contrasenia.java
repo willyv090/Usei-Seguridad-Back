@@ -1,10 +1,12 @@
 package com.usei.usei.models;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import java.time.LocalDate;
 
 @Entity
 @Table(name = "contrasenia")
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Contrasenia {
 
     @Id

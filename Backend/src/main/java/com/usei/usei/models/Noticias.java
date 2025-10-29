@@ -8,17 +8,8 @@ import java.io.Serializable;
 import java.time.LocalDateTime;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
-import jakarta.persistence.Basic;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.NamedQueries;
-import jakarta.persistence.NamedQuery;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 
 /**
@@ -66,7 +57,8 @@ public class Noticias implements Serializable {
     private String estado;
 
     @JoinColumn(name = "usuario_id_usuario", referencedColumnName = "id_usuario")
-    @ManyToOne(optional = false)
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JsonIgnoreProperties({"contraseniaEntity", "rolEntity", "encuestaCollection", "noticiasCollection"})
     private Usuario usuarioIdUsuario;
 
     public Noticias() {

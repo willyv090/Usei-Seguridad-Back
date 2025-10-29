@@ -13,59 +13,41 @@ import java.util.*;
 
 @Service
 public class AuthenticationService {
-
     @Autowired
     private UsuarioDAO usuarioDAO;
-
     @Autowired
     private EstudianteDAO estudianteDAO;
-
     @Autowired
     private PasswordEncoder passwordEncoder;
-
     @Autowired
     private ContraseniaDAO contraseniaDAO;
-
     @Autowired
     private RolDAO rolDAO;
-
     @Autowired
     private com.usei.usei.util.PasswordPolicyUtil passwordPolicyUtil;
 
-    /**
-     * Método principal de autenticación que maneja tanto Usuario como Estudiante
-     */
     @Transactional
     public Map<String, Object> authenticate(String correo, String passwordPlano) {
         Map<String, Object> result = new HashMap<>();
 
-        // ========================================
-        // INTENTAR LOGIN COMO USUARIO
-        // ========================================
+        // LOGIN COMO USUARIO
         Optional<Usuario> usuarioOpt = usuarioDAO.findByCorreo(correo);
         if (usuarioOpt.isPresent()) {
             return authenticateUsuario(usuarioOpt.get(), passwordPlano);
         }
 
-        // ========================================
-        // INTENTAR LOGIN COMO ESTUDIANTE
-        // ========================================
+        // LOGIN COMO ESTUDIANTE
         Optional<Estudiante> estudianteOpt = estudianteDAO.findByCorreoInstitucional(correo);
         if (estudianteOpt.isPresent()) {
             return authenticateEstudiante(estudianteOpt.get(), passwordPlano);
         }
 
-        // ========================================
         // NO SE ENCONTRÓ EL USUARIO
-        // ========================================
         result.put("success", false);
         result.put("message", "No se encontró ninguna cuenta con ese correo electrónico.");
         return result;
     }
 
-    /**
-     * Autenticación para Usuario (usa tabla Contrasenia)
-     */
     private Map<String, Object> authenticateUsuario(Usuario usuario, String passwordPlano) {
         Map<String, Object> result = new HashMap<>();
         Contrasenia contrasenia = usuario.getContraseniaEntity();
@@ -113,16 +95,14 @@ public class AuthenticationService {
         contrasenia.setUltimoLog(LocalDate.now());
         contraseniaDAO.save(contrasenia);
 
-        // 🔒 NEW: Check if password complies with current security policies
-        System.out.println("🔒 === CHECKING POLICY COMPLIANCE IN AUTH SERVICE ===");
+        System.out.println("=== CHECKING POLICY COMPLIANCE IN AUTH SERVICE ===");
         boolean complies = passwordPolicyUtil.existingPasswordCompliesWithCurrentPolicy(contrasenia);
-        System.out.println("🔒 Policy compliance result: " + complies);
+        System.out.println("Policy compliance result: " + complies);
         
         if (!complies) {
-            System.out.println("🔒 Password does not comply with current policies - forcing password change");
-            System.out.println("🔒 User: " + usuario.getCorreo() + " (ID: " + usuario.getIdUsuario() + ")");
-            
-            // Mark user for mandatory password change
+            System.out.println("Password does not comply with current policies - forcing password change");
+            System.out.println("User: " + usuario.getCorreo() + " (ID: " + usuario.getIdUsuario() + ")");
+
             usuario.setCambioContrasenia(true);
             usuarioDAO.save(usuario);
             
@@ -130,7 +110,7 @@ public class AuthenticationService {
             result.put("message", "Las políticas de seguridad han sido actualizadas. Debe cambiar su contraseña.");
             result.put("politicaActualizada", true);
             result.put("idUsuario", usuario.getIdUsuario());
-            System.out.println("🔒 Returning politicaActualizada response");
+            System.out.println("Returning politicaActualizada response");
             return result;
         } else {
             // 🔒 Password is compliant - ensure cambioContrasenia flag is cleared
@@ -141,9 +121,7 @@ public class AuthenticationService {
             }
         }
 
-        // ======================================================
-        // 🔹 OBTENER ACCESOS DESDE EL ROL Y GUARDAR EN DATA
-        // ======================================================
+        // OBTENER ACCESOS DESDE EL ROL Y GUARDAR EN DATA
         List<String> accesos = parseAccesos(usuario.getRolEntity());
 
         // Crear objeto interno "data" con todos los datos del usuario
@@ -161,14 +139,13 @@ public class AuthenticationService {
         result.put("success", true);
         result.put("tipo", "usuario");
         result.put("data", data);
-        result.put("accesos", accesos); // también afuera 
+        result.put("accesos", accesos);
         result.put("cambioContrasenia", usuario.getCambioContrasenia());
         return result;
     }
 
-    /**
-     * Autenticación para Estudiante (usa campo contrasena hasheado con BCrypt)
-     */
+     // Autenticación para Estudiante (usa campo contrasena hasheado con BCrypt)
+
     private Map<String, Object> authenticateEstudiante(Estudiante estudiante, String passwordPlano) {
         Map<String, Object> result = new HashMap<>();
         String contrasenaHasheada = estudiante.getContrasena();
@@ -219,9 +196,8 @@ public class AuthenticationService {
         return result;
     }
 
-    /**
-     * Parsea los accesos del rol desde formato CSV (campo texto)
-     */
+     // Parsea los accesos del rol desde formato CSV (campo texto)
+
     private List<String> parseAccesos(Rol rol) {
         if (rol == null || rol.getAccesos() == null || rol.getAccesos().isEmpty()) {
             return new ArrayList<>();
@@ -240,9 +216,7 @@ public class AuthenticationService {
         return resultado;
     }
 
-    /**
-     * Verifica si un rol tiene un acceso específico
-     */
+     // Verifica si un rol tiene un acceso específico
     public boolean tieneAcceso(Rol rol, String accesoRequerido) {
         List<String> accesos = parseAccesos(rol);
         return accesos.stream()
