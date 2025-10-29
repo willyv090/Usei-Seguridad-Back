@@ -1,5 +1,6 @@
 package com.usei.usei.models;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import java.time.LocalDate;
 
@@ -62,4 +63,10 @@ public class Contrasenia {
 
     public LocalDate getUltimoLog() { return ultimoLog; }
     public void setUltimoLog(LocalDate ultimoLog) { this.ultimoLog = ultimoLog; }
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "Contrasenia_id_pass", referencedColumnName = "id_pass", nullable = false)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    private Contrasenia contraseniaEntity;
+
 }
