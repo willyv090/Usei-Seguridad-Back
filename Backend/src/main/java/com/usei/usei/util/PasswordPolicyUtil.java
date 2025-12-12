@@ -198,7 +198,7 @@ public class PasswordPolicyUtil {
         // First check: If password was created AFTER policy update, it's automatically valid
         if (passwordCreated != null && policyModified != null) {
             java.time.LocalDate policyModifiedDate = policyModified.toLocalDate();
-            
+
             if (passwordCreated.isAfter(policyModifiedDate)) {
                 System.out.println("✅ Password created AFTER policy update - automatically valid");
                 return true;
@@ -209,7 +209,7 @@ public class PasswordPolicyUtil {
         // check if it meets current requirements
         System.out.println("🔒 Checking if password meets current policy requirements...");
         boolean meetsRequirements = passwordMeetsCurrentRequirements(contrasenia, config);
-        
+
         if (meetsRequirements) {
             System.out.println("✅ Password meets current policy requirements - allowing login");
             return true;
@@ -226,7 +226,7 @@ public class PasswordPolicyUtil {
      */
     private boolean passwordMeetsCurrentRequirements(com.usei.usei.models.Contrasenia contrasenia, ConfiguracionSeguridad config) {
         System.out.println("🔍 Checking password compliance with current policy...");
-        
+
         // Check length requirement
         if (contrasenia.getLongitud() < config.getMinLongitudContrasenia()) {
             System.out.println("❌ Password too short: " + contrasenia.getLongitud() + " < " + config.getMinLongitudContrasenia());
@@ -241,10 +241,10 @@ public class PasswordPolicyUtil {
         if (config.isRequerirSimbolos()) requiredComplexity++;
 
         System.out.println("🔒 Password stored complexity: " + contrasenia.getComplejidad() + ", Current policy requires: " + requiredComplexity);
-        System.out.println("🔒 Policy requirements - Upper: " + config.isRequerirMayusculas() + 
-                           ", Lower: " + config.isRequerirMinusculas() + 
-                           ", Numbers: " + config.isRequerirNumeros() + 
-                           ", Symbols: " + config.isRequerirSimbolos());
+        System.out.println("🔒 Policy requirements - Upper: " + config.isRequerirMayusculas() +
+                ", Lower: " + config.isRequerirMinusculas() +
+                ", Numbers: " + config.isRequerirNumeros() +
+                ", Symbols: " + config.isRequerirSimbolos());
 
         // Check if password complexity meets current requirements
         if (contrasenia.getComplejidad() < requiredComplexity) {
