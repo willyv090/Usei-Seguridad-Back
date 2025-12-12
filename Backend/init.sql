@@ -191,8 +191,13 @@ CREATE TABLE H_Usuario (
 CREATE TABLE Log_Usuario (
     id_log serial  NOT NULL,
     fecha_log timestamp  NOT NULL,
-    motivo varchar(150)  NOT NULL,
+    tipo_log varchar(150)  NOT NULL,
     Usuario_id_usuario int  NOT NULL,
+    modulo varchar(150)  NOT NULL,
+    motivo varchar(150)  NOT NULL,
+    nivel varchar(150)  NOT NULL,
+    mensaje varchar(150)  NOT NULL,
+    detalle varchar(150)  NOT NULL,
     CONSTRAINT Log_Usuario_pk PRIMARY KEY (id_log)
 );
 -- Table: Noticias

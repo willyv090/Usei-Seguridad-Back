@@ -279,30 +279,11 @@ public class UsuarioAPI {
                                             @RequestBody HashMap<String, String> body) {
         try {
             System.out.println("=== CHANGE PASSWORD DEBUG ===");
-            System.out.println("🔍 Raw idUsuario parameter: " + idUsuario);
-            System.out.println("🔍 idUsuario type: " + (idUsuario != null ? idUsuario.getClass().getSimpleName() : "null"));
-            System.out.println("🔍 Request body: " + body);
+            System.out.println("idUsuario: " + idUsuario);
             System.out.println("securityBL is null? " + (securityBL == null));
             System.out.println("usuarioService is null? " + (usuarioService == null));
             System.out.println("tokenGenerator is null? " + (tokenGenerator == null));
             System.out.println("rolBL is null? " + (rolBL == null));
-
-            // Let's check if this idUsuario actually exists in the database
-            try {
-                Optional<Usuario> testUser = usuarioService.findById(idUsuario);
-                System.out.println("🔍 User found by ID " + idUsuario + ": " + testUser.isPresent());
-                if (testUser.isPresent()) {
-                    Usuario u = testUser.get();
-                    System.out.println("🔍 Found user: " + u.getCorreo() + " (CI: " + u.getCi() + ")");
-                } else {
-                    System.out.println("❌ NO USER FOUND with ID: " + idUsuario);
-                    // Maybe it's a CI? Let's check
-                    System.out.println("🔍 Checking if " + idUsuario + " might be a CI...");
-                }
-            } catch (Exception lookupEx) {
-                System.err.println("❌ Error during user lookup: " + lookupEx.getMessage());
-                lookupEx.printStackTrace();
-            }
 
             if (securityBL == null) {
                 System.err.println("SecurityBL is null! Dependency injection failed!");

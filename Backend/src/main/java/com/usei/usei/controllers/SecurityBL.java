@@ -9,7 +9,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -85,81 +84,55 @@ public class SecurityBL {
 
     @Transactional
     public PasswordChangeStatus changePassword(Long idUsuario, String nuevaPlano) {
-        try {
-            System.out.println("🔍 Starting password change for user ID: " + idUsuario);
-
-            if (!passwordPolicyUtil.cumplePolitica(nuevaPlano)) {
-                System.out.println("❌ Password does not meet policy requirements");
-                return PasswordChangeStatus.POLITICA_NO_CUMPLIDA;
-            }
-
-            System.out.println("🔍 Looking up user with ID: " + idUsuario);
-            Optional<Usuario> ou = usuarioService.findById(idUsuario);
-            if (ou.isEmpty()) {
-                System.out.println("❌ User not found with ID: " + idUsuario);
-                return PasswordChangeStatus.USUARIO_SIN_CONTRASENIA;
-            }
-
-            Usuario u = ou.get();
-            System.out.println("✅ User found: " + u.getCorreo());
-
-            Contrasenia actual = u.getContraseniaEntity();
-            if (actual == null) {
-                System.out.println("❌ User has no password entity");
-                return PasswordChangeStatus.USUARIO_SIN_CONTRASENIA;
-            }
-
-            System.out.println("✅ Current password entity found");
-
-            // no igual a la actual
-            if (bcrypt.matches(nuevaPlano, actual.getContrasenia())) {
-                System.out.println("❌ New password is same as current password");
-                return PasswordChangeStatus.REUTILIZACION_ULTIMA;
-            }
-
-            // Check password history to prevent reuse (with safe error handling)
-            try {
-                LocalDateTime desde = LocalDateTime.now().minusMonths(passwordPolicyUtil.getNoReuseMeses());
-                List<String> hashes = hContraseniaDAO.findHashesSince(u.getIdUsuario(), desde);
-                boolean reused = hashes.stream().anyMatch(h -> bcrypt.matches(nuevaPlano, h));
-                if (reused) {
-                    System.out.println("🚫 Password reuse detected for user: " + u.getIdUsuario());
-                    return PasswordChangeStatus.REUTILIZACION_HISTORIAL;
-                }
-                System.out.println("✅ Password history check passed for user: " + u.getIdUsuario());
-            } catch (Exception e) {
-                System.err.println("⚠️ Warning: Could not check password history: " + e.getMessage());
-                // Continue with password change - don't block user due to history check failure
-                // This ensures password changes work even if history table has issues
-            }
-
-            // Save current password to history before updating (in separate transaction)
-            this.savePasswordToHistorySafely(actual, u.getIdUsuario());
-
-            // actualizar nueva contraseña
-            System.out.println("🔍 Updating password...");
-            String nuevoHash = bcrypt.encode(nuevaPlano);
-            actual.setContrasenia(nuevoHash);
-            actual.setFechaCreacion(LocalDate.now());
-            actual.setUltimoLog(LocalDate.now());
-            actual.setLongitud(nuevaPlano.length());
-            actual.setComplejidad(passwordPolicyUtil.calcularComplejidad(nuevaPlano));
-            actual.setIntentosRestantes(passwordPolicyUtil.getMaxIntentos());
-            contraseniaDAO.save(actual);
-            System.out.println("✅ Password updated in database");
-
-            u.setCambioContrasenia(false);
-            usuarioService.save(u);
-            System.out.println("✅ User cambio_contrasenia flag reset");
-
-            System.out.println("✅ Password change completed successfully for user: " + u.getCorreo());
-            return PasswordChangeStatus.CAMBIO_OK;
-
-        } catch (Exception e) {
-            System.err.println("❌ Unexpected error in changePassword: " + e.getMessage());
-            e.printStackTrace();
-            throw e; // Re-throw to trigger transaction rollback
+        if (!passwordPolicyUtil.cumplePolitica(nuevaPlano)) {
+            return PasswordChangeStatus.POLITICA_NO_CUMPLIDA;
         }
+
+        Optional<Usuario> ou = usuarioService.findById(idUsuario);
+        if (ou.isEmpty()) return PasswordChangeStatus.USUARIO_SIN_CONTRASENIA;
+
+        Usuario u = ou.get();
+        Contrasenia actual = u.getContraseniaEntity();
+        if (actual == null) return PasswordChangeStatus.USUARIO_SIN_CONTRASENIA;
+
+        // no igual a la actual
+        if (bcrypt.matches(nuevaPlano, actual.getContrasenia())) {
+            return PasswordChangeStatus.REUTILIZACION_ULTIMA;
+        }
+
+        // no reutilizar en X meses: traer hashes del historial y verificar
+        LocalDateTime desde = LocalDateTime.now().minusMonths(passwordPolicyUtil.getNoReuseMeses());
+        List<String> hashes = hContraseniaDAO.findHashesSince(u.getIdUsuario(), desde);
+        boolean reused = hashes.stream().anyMatch(h -> bcrypt.matches(nuevaPlano, h));
+        if (reused) return PasswordChangeStatus.REUTILIZACION_HISTORIAL;
+
+        // guardar la contraseña actual en H_Contrasenia
+        hContraseniaDAO.insertHist(
+                actual.getIdPass(),
+                actual.getContrasenia(),
+                actual.getFechaCreacion(),
+                actual.getLongitud(),
+                actual.getComplejidad(),
+                actual.getIntentosRestantes(),
+                actual.getUltimoLog(),
+                LocalDateTime.now(),
+                u.getIdUsuario()
+        );
+
+        // actualizar nueva contraseña
+        String nuevoHash = bcrypt.encode(nuevaPlano);
+        actual.setContrasenia(nuevoHash);
+        actual.setFechaCreacion(LocalDate.now());
+        actual.setUltimoLog(LocalDate.now());
+        actual.setLongitud(nuevaPlano.length()); // Set actual length of new password
+        actual.setComplejidad(passwordPolicyUtil.calcularComplejidad(nuevaPlano)); // Calculate actual complexity
+        actual.setIntentosRestantes(passwordPolicyUtil.getMaxIntentos());
+        contraseniaDAO.save(actual);
+
+        u.setCambioContrasenia(false);
+        usuarioService.save(u);
+
+        return PasswordChangeStatus.CAMBIO_OK;
     }
 
     @Transactional
@@ -217,57 +190,5 @@ public class SecurityBL {
         }
 
         System.out.println("Marked " + updatedCount + " users for mandatory password change due to policy update.");
-    }
-
-    /**
-     * Save password to history in a separate transaction to avoid aborting the main transaction
-     */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void savePasswordToHistorySafely(Contrasenia contrasenia, Long userId) {
-        try {
-            // Use a unique timestamp to avoid primary key conflicts
-            LocalDateTime txDate = LocalDateTime.now();
-
-            // Check if this timestamp already exists for this id_pass and adjust if needed
-            int attempts = 0;
-            while (attempts < 10) { // Safety limit
-                try {
-                    hContraseniaDAO.insertHist(
-                            contrasenia.getIdPass(),
-                            contrasenia.getContrasenia(),
-                            contrasenia.getFechaCreacion(),
-                            contrasenia.getLongitud(),
-                            contrasenia.getComplejidad(),
-                            contrasenia.getIntentosRestantes(),
-                            contrasenia.getUltimoLog(),
-                            txDate,
-                            userId
-                    );
-                    System.out.println("✅ Current password saved to history before update");
-                    break; // Success, exit the retry loop
-                } catch (Exception insertException) {
-                    if (insertException.getMessage() != null &&
-                            (insertException.getMessage().contains("duplicate key") ||
-                                    insertException.getMessage().contains("unique constraint"))) {
-                        // Primary key conflict, adjust timestamp and retry
-                        attempts++;
-                        txDate = txDate.plusNanos(1000); // Add 1 microsecond
-                        System.out.println("⚠️ PK conflict, retrying with adjusted timestamp, attempt: " + attempts);
-                    } else {
-                        // Different error, don't retry
-                        throw insertException;
-                    }
-                }
-            }
-
-            if (attempts >= 10) {
-                System.err.println("⚠️ Could not save password to history after 10 attempts");
-            }
-
-        } catch (Exception e) {
-            System.err.println("⚠️ Warning: Could not save current password to history: " + e.getMessage());
-            e.printStackTrace();
-            // This is in a separate transaction, so failure here won't affect the main password change
-        }
     }
 }

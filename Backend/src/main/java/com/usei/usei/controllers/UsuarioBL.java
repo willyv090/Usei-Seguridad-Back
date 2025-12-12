@@ -134,7 +134,9 @@ public class UsuarioBL implements UsuarioService {
                 }
             }
             Usuario saved = usuarioDAO.save(usuario);
-            registrarLog(saved, "Creación de usuario");
+            String motivo = "CREACION_USUARIO";
+            String detalle = "Creación de usuario desde ABM (alta inicial)";
+            registrarLog(saved, motivo, detalle);
             return saved;
 
         }
@@ -156,7 +158,11 @@ public class UsuarioBL implements UsuarioService {
             log.setUsuario(dummyUser);
         }
         logUsuarioDAO.saveAll(logs);
-        registrarLog(dummyUser, "Eliminación del usuario: " + usuario.getNombre() + " " + usuario.getApellido());
+        String motivo = "ELIMINACION_USUARIO";
+        String detalle = "Eliminación del usuario "
+                + usuario.getNombre() + " " + usuario.getApellido()
+                + " (id=" + usuario.getIdUsuario() + ") y reasignación de logs al usuario sistema (id=1)";
+        registrarLog(dummyUser, motivo, detalle);
         usuarioDAO.delete(usuario);
 
         System.out.println("✅ Usuario eliminado correctamente y logs reasignados a usuario sistema.");
@@ -182,7 +188,9 @@ public class UsuarioBL implements UsuarioService {
             u.setRol(usuario.getRolEntity().getNombreRol());
         }
         Usuario updated = usuarioDAO.save(u);
-        registrarLog(updated, "Actualización de usuario");
+        String motivo = "ACTUALIZACION_USUARIO";
+        String detalle = "Actualización de datos del usuario con id=" + updated.getIdUsuario();
+        registrarLog(updated, motivo, detalle);
         return updated;
 
     }
@@ -418,28 +426,35 @@ public class UsuarioBL implements UsuarioService {
 
     //Metodo auxiliar para el manejo de logs en abm usuario
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    private void registrarLog(Usuario usuario, String motivo) {
+    private void registrarLog(Usuario usuario, String motivo, String detalle) {
         try {
             if (usuario == null) {
                 System.err.println("No se puede registrar log: usuario es null.");
                 return;
             }
 
-            // Crear registro de log
-            LogUsuario log = new LogUsuario(
-                    usuario,
-                    motivo,
-                    java.time.LocalDateTime.now()
-            );
+            LogUsuario log = new LogUsuario();
+            log.setUsuario(usuario);
+            log.setFechaLog(java.time.LocalDateTime.now());
+
+            // Igual que en LogUsuarioService: ABM de usuario = seguridad
+            log.setTipoLog("SEGURIDAD");
+            log.setModulo("USUARIO");
+
+            log.setMotivo(motivo);       // "Creación de usuario", "Eliminación de usuario", etc.
+            log.setNivel("INFO");        // puedes cambiarlo según el caso si más adelante diferencias
+
+            log.setMensaje(motivo);
+            log.setDetalle(detalle);
 
             logUsuarioDAO.save(log);
-            System.out.println("Log registrado correctamente: " + motivo + " (Usuario ID: " + usuario.getIdUsuario() + ")");
+            System.out.println("Log registrado correctamente: "
+                    + motivo + " (Usuario ID: " + usuario.getIdUsuario() + ")");
 
         } catch (Exception e) {
             System.err.println("Error al registrar log de usuario: " + e.getMessage());
             e.printStackTrace();
         }
     }
-
 
 }
