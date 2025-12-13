@@ -91,7 +91,7 @@ public class RolAPI {
         }
         return ResponseEntity.ok(rol);
     }
-     //Modificar rol
+    //Modificar rol
     @PutMapping("/{idRol}")
     public ResponseEntity<?> actualizarRol(@PathVariable Long idRol, @RequestBody Rol rolActualizado) {
         try {
@@ -112,35 +112,35 @@ public class RolAPI {
         try {
             Long idRol = Long.parseLong(request.get("idRol").toString());
             String accesoRequerido = request.get("acceso").toString();
-            
+
             Rol rol = rolBL.obtenerRolPorId(idRol);
             if (rol == null) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Map.of(
-                        "tieneAcceso", false,
-                        "error", "Rol no encontrado"
-                    ));
+                        .body(Map.of(
+                                "tieneAcceso", false,
+                                "error", "Rol no encontrado"
+                        ));
             }
-            
+
             if (rol.getAccesos() == null || rol.getAccesos().isEmpty()) {
                 return ResponseEntity.ok(Map.of("tieneAcceso", false));
             }
-            
+
             String[] accesos = rol.getAccesos().split(",");
             boolean tieneAcceso = Arrays.stream(accesos)
-                .map(String::trim)
-                .anyMatch(a -> a.equalsIgnoreCase(accesoRequerido));
-            
+                    .map(String::trim)
+                    .anyMatch(a -> a.equalsIgnoreCase(accesoRequerido));
+
             return ResponseEntity.ok(Map.of(
-                "tieneAcceso", tieneAcceso,
-                "accesosDisponibles", Arrays.asList(accesos)
+                    "tieneAcceso", tieneAcceso,
+                    "accesosDisponibles", Arrays.asList(accesos)
             ));
-            
+
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of(
-                    "error", "Error al verificar acceso: " + e.getMessage()
-                ));
+                    .body(Map.of(
+                            "error", "Error al verificar acceso: " + e.getMessage()
+                    ));
         }
     }
 
@@ -151,23 +151,23 @@ public class RolAPI {
             Rol rol = rolBL.obtenerRolPorId(idRol);
             if (rol == null) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Map.of("error", "Rol no encontrado"));
+                        .body(Map.of("error", "Rol no encontrado"));
             }
-            
+
             if (rol.getAccesos() == null || rol.getAccesos().isEmpty()) {
                 return ResponseEntity.ok(Map.of("accesos", new String[0]));
             }
-            
+
             String[] accesos = rol.getAccesos().split(",");
             return ResponseEntity.ok(Map.of(
-                "idRol", idRol,
-                "nombreRol", rol.getNombreRol(),
-                "accesos", Arrays.stream(accesos).map(String::trim).toArray()
+                    "idRol", idRol,
+                    "nombreRol", rol.getNombreRol(),
+                    "accesos", Arrays.stream(accesos).map(String::trim).toArray()
             ));
-            
+
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("error", "Error al obtener accesos: " + e.getMessage()));
+                    .body(Map.of("error", "Error al obtener accesos: " + e.getMessage()));
         }
     }
 }

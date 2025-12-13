@@ -22,29 +22,43 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
             return true;
         }
 
-        String path = request.getRequestURI();
+        final String path = request.getRequestURI();
+        final String method = request.getMethod();
 
-        // RUTAS PÚBLICAS
-        if (path.equals("/auth/login") ||
-                path.startsWith("/estudiante/enviarCodigoVerificacion") ||
-                path.startsWith("/usuario/enviarCodigoVerificacion")) {
+        // ====== RUTAS PÚBLICAS (SIN TOKEN) ======
+
+        // Login y recuperación de contraseña
+        if (path.equals("/auth/login")
+                || path.startsWith("/estudiante/enviarCodigoVerificacion")
+                || path.startsWith("/usuario/enviarCodigoVerificacion")) {
             return true;
         }
 
-        // MÓDULO DE SEGURIDAD SIN TOKEN (tu decisión actual)
-        if (path.startsWith("/usuario") || path.startsWith("/rol")) {
-            return true;
-        }
+        // (IMPORTANTE) /usuario y /rol YA NO son públicos en general.
+        // Si dejabas /rol público completo, no tendrás userId y no podrás loguear acciones.
+        // Si necesitas endpoints públicos específicos de /usuario, ponlos aquí puntualmente (no todo /usuario).
 
         // Recursos estáticos
-        if (path.startsWith("/documents/") ||
-                path.startsWith("/imagenes/") ||
-                path.equals("/noticia/carrusel")) {
+        if (path.startsWith("/documents/")
+                || path.startsWith("/imagenes/")
+                || path.equals("/noticia/carrusel")) {
             return true;
         }
 
-        // VALIDACIÓN DE TOKEN
+        // Roles: permitir listar/obtener (GET) sin token si quieres mantenerlo público
+        if (path.startsWith("/rol") && "GET".equalsIgnoreCase(method)) {
+            return true;
+        }
+
+        // Verificar acceso (normalmente se usa sin token desde el frontend)
+        if (path.equals("/rol/verificar-acceso")) {
+            return true;
+        }
+
+        // ====== VALIDACIÓN DE TOKEN PARA TODO LO DEMÁS ======
         String authHeader = request.getHeader("Authorization");
+
+        // Si NO hay token -> 401
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType("application/json");
@@ -52,7 +66,7 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
             return false;
         }
 
-        // ✅ Pasamos el header completo (TokenGenerator recorta Bearer)
+        // Validar token
         Jws<Claims> claims = tokenGenerator.validateAndParseToken(authHeader);
         if (claims == null) {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
@@ -61,7 +75,7 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
             return false;
         }
 
-        // Guardar datos para uso posterior
+        // Guardar datos del usuario en el request para uso posterior
         request.setAttribute("userId", claims.getBody().get("id"));
         request.setAttribute("userType", claims.getBody().get("type"));
         request.setAttribute("username", claims.getBody().get("username"));
