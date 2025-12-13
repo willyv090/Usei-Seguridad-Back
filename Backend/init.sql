@@ -331,15 +331,6 @@ CREATE TABLE Usuario (
     CONSTRAINT Usuario_pk PRIMARY KEY (id_usuario)
 );
 
--- Table: Log_Usuario
-CREATE TABLE Log_Usuario (
-    id_log serial NOT NULL,
-    fecha_log timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    motivo varchar(150) NOT NULL,
-    Usuario_id_usuario int NOT NULL,
-    CONSTRAINT Log_Usuario_pk PRIMARY KEY (id_log)
-);
-
 --Esto acelera las búsquedas por usuario
 CREATE INDEX idx_log_usuario_user
 ON Log_Usuario (Usuario_id_usuario);
@@ -361,6 +352,74 @@ CREATE TABLE configuracion_seguridad (
     activa boolean  NOT NULL DEFAULT true,
     CONSTRAINT configuracion_seguridad_pk PRIMARY KEY (id_config)
 );
+-- Table: riesgo_evento
+CREATE TABLE riesgo_evento (
+    id_riesgo serial  NOT NULL,
+    titulo varchar(200)  NOT NULL,
+    descripcion text  NOT NULL,
+    categoria varchar(100)  NOT NULL,
+    probabilidad int  NOT NULL,
+    impacto int  NOT NULL,
+    nivel_riesgo varchar(20)  NOT NULL,
+    valor_riesgo int  NOT NULL,
+    consecuencias text  NOT NULL,
+    plan_accion text  NOT NULL,
+    fecha_registro timestamp  NOT NULL,
+    fecha_identificacion date  NOT NULL,
+    responsable varchar(150)  NOT NULL,
+    estado varchar(50)  NOT NULL,
+    fecha_actualizacion timestamp,
+    usuario_registro varchar(100)  NOT NULL,
+    CONSTRAINT riesgo_evento_pk PRIMARY KEY (id_riesgo)
+);
+
+-- Table: indicador_riesgo
+CREATE TABLE indicador_riesgo (
+    id_indicador serial  NOT NULL,
+    nombre varchar(200)  NOT NULL,
+    descripcion text  NOT NULL,
+    tipo_indicador varchar(100)  NOT NULL,
+    umbral_critico decimal(10,2)  NOT NULL,
+    umbral_advertencia decimal(10,2)  NOT NULL,
+    valor_actual decimal(10,2)  NOT NULL,
+    unidad_medida varchar(50)  NOT NULL,
+    frecuencia_medicion varchar(50)  NOT NULL,
+    estado_actual varchar(20)  NOT NULL,
+    ultima_actualizacion timestamp,
+    fecha_creacion timestamp  NOT NULL,
+    activo boolean  NOT NULL,
+    usuario_creacion varchar(100)  NOT NULL,
+    CONSTRAINT indicador_riesgo_pk PRIMARY KEY (id_indicador)
+);
+
+-- Table: historial_kri
+CREATE TABLE historial_kri (
+    id_medicion serial  NOT NULL,
+    id_indicador int  NOT NULL,
+    valor_medido decimal(10,2)  NOT NULL,
+    fecha_medicion timestamp  NOT NULL,
+    estado_evaluado varchar(20)  NOT NULL,
+    observaciones text,
+    usuario_medicion varchar(100)  NOT NULL,
+    CONSTRAINT historial_kri_pk PRIMARY KEY (id_medicion)
+);
+
+-- Table: accion_mitigacion
+CREATE TABLE accion_mitigacion (
+    id_accion serial  NOT NULL,
+    id_riesgo int  NOT NULL,
+    descripcion_accion text  NOT NULL,
+    responsable_accion varchar(150)  NOT NULL,
+    fecha_inicio date  NOT NULL,
+    fecha_limite date  NOT NULL,
+    fecha_completada date,
+    estado varchar(50)  NOT NULL,
+    efectividad varchar(20),
+    observaciones text,
+    fecha_registro timestamp  NOT NULL,
+    CONSTRAINT accion_mitigacion_pk PRIMARY KEY (id_accion)
+);
+
 
 -- foreign keys
 -- Reference: Certificado_Usuario (table: Certificado)
@@ -582,100 +641,18 @@ ALTER TABLE Log_Usuario ADD CONSTRAINT Log_Usuario_Usuario
     INITIALLY IMMEDIATE;
 
 ALTER TABLE Contrasenia DROP COLUMN IF EXISTS contrasenia_id_pass;
+-- Reference: historial_kri_indicador_riesgo (table: historial_kri)
+ALTER TABLE historial_kri ADD CONSTRAINT historial_kri_indicador_riesgo
+    FOREIGN KEY (id_indicador)
+    REFERENCES indicador_riesgo (id_indicador)  
+    NOT DEFERRABLE 
+    INITIALLY IMMEDIATE
+;
 
--- ===============================================
--- MÓDULO DE ANÁLISIS DE RIESGOS
--- Sistema de Gestión de Riesgos de Seguridad
--- ===============================================
-
--- Eliminar tablas existentes si existen (en orden correcto por dependencias)
-DROP TABLE IF EXISTS historial_kri CASCADE;
-DROP TABLE IF EXISTS accion_mitigacion CASCADE;
-DROP TABLE IF EXISTS riesgo_evento CASCADE;
-DROP TABLE IF EXISTS indicador_riesgo CASCADE;
-
--- Tabla para almacenar eventos de riesgo
-CREATE TABLE riesgo_evento (
-    id_riesgo SERIAL PRIMARY KEY,
-    titulo VARCHAR(200) NOT NULL,
-    descripcion TEXT NOT NULL,
-    categoria VARCHAR(100) NOT NULL,
-    
-    -- Análisis de riesgo
-    probabilidad INTEGER NOT NULL CHECK (probabilidad >= 1 AND probabilidad <= 5),
-    impacto INTEGER NOT NULL CHECK (impacto >= 1 AND impacto <= 5),
-    nivel_riesgo VARCHAR(20) NOT NULL,
-    valor_riesgo INTEGER NOT NULL,
-    
-    -- Consecuencias y mitigación
-    consecuencias TEXT NOT NULL,
-    plan_accion TEXT NOT NULL,
-    
-    -- Información administrativa
-    fecha_registro TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    fecha_identificacion DATE NOT NULL,
-    responsable VARCHAR(150) NOT NULL,
-    estado VARCHAR(50) NOT NULL DEFAULT 'Identificado',
-    
-    -- Auditoría
-    fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    usuario_registro VARCHAR(100) NOT NULL
-);
-
--- Tabla para indicadores clave de riesgo (KRI)
-CREATE TABLE indicador_riesgo (
-    id_indicador SERIAL PRIMARY KEY,
-    nombre VARCHAR(200) NOT NULL,
-    descripcion TEXT NOT NULL,
-    tipo_indicador VARCHAR(100) NOT NULL,
-    umbral_critico DECIMAL(10,2) NOT NULL,
-    umbral_advertencia DECIMAL(10,2) NOT NULL,
-    valor_actual DECIMAL(10,2) NOT NULL DEFAULT 0,
-    unidad_medida VARCHAR(50) NOT NULL,
-    frecuencia_medicion VARCHAR(50) NOT NULL,
-    
-    -- Estado del indicador
-    estado_actual VARCHAR(20) NOT NULL DEFAULT 'Normal',
-    ultima_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    fecha_creacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    activo BOOLEAN DEFAULT TRUE,
-    
-    -- Auditoría
-    usuario_creacion VARCHAR(100) NOT NULL
-);
-
--- Tabla para historial de mediciones de KRI
-CREATE TABLE historial_kri (
-    id_medicion SERIAL PRIMARY KEY,
-    id_indicador INTEGER NOT NULL REFERENCES indicador_riesgo(id_indicador),
-    valor_medido DECIMAL(10,2) NOT NULL,
-    fecha_medicion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    estado_evaluado VARCHAR(20) NOT NULL,
-    observaciones TEXT,
-    usuario_medicion VARCHAR(100) NOT NULL
-);
-
--- Tabla para acciones de mitigación
-CREATE TABLE accion_mitigacion (
-    id_accion SERIAL PRIMARY KEY,
-    id_riesgo INTEGER NOT NULL REFERENCES riesgo_evento(id_riesgo),
-    descripcion_accion TEXT NOT NULL,
-    responsable_accion VARCHAR(150) NOT NULL,
-    fecha_inicio DATE NOT NULL,
-    fecha_limite DATE NOT NULL,
-    fecha_completada DATE,
-    estado VARCHAR(50) NOT NULL DEFAULT 'Pendiente',
-    efectividad VARCHAR(20),
-    observaciones TEXT,
-    fecha_registro TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
--- Índices para mejorar rendimiento
-CREATE INDEX idx_riesgo_estado ON riesgo_evento(estado);
-CREATE INDEX idx_riesgo_nivel ON riesgo_evento(nivel_riesgo);
-CREATE INDEX idx_riesgo_fecha ON riesgo_evento(fecha_identificacion);
-CREATE INDEX idx_indicador_activo ON indicador_riesgo(activo);
-CREATE INDEX idx_historial_kri_fecha ON historial_kri(fecha_medicion);
-CREATE INDEX idx_accion_estado ON accion_mitigacion(estado);
-
-
+-- Reference: accion_mitigacion_riesgo_evento (table: accion_mitigacion)
+ALTER TABLE accion_mitigacion ADD CONSTRAINT accion_mitigacion_riesgo_evento
+    FOREIGN KEY (id_riesgo)
+    REFERENCES riesgo_evento (id_riesgo)  
+    NOT DEFERRABLE 
+    INITIALLY IMMEDIATE
+;
