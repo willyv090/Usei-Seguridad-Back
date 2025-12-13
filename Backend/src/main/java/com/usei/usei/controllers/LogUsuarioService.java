@@ -7,8 +7,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-
 @Service
 public class LogUsuarioService {
 
@@ -19,28 +17,40 @@ public class LogUsuarioService {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void registrarLogSeguridad(
+    public void registrarLog(
             Usuario usuario,
-            String motivo,        // LOGIN_OK, LOGIN_FAIL, etc.
+            String tipoLog,       // SEGURIDAD, SISTEMA, etc.
+            String modulo,        // LOGS, AUTH, USUARIOS, etc.
+            String motivo,        // VER_LOGS, LOGIN_OK...
             String nivel,         // INFO, WARN, ERROR...
             String mensaje,       // texto legible
-            String detalle        // JSON o texto extra (puede ser null)
+            String detalle        // texto/JSON extra
     ) {
         try {
             LogUsuario log = new LogUsuario(
                     usuario,
-                    "SEGURIDAD",    // tipo_log
-                    "AUTH",         // modulo (por ejemplo)
+                    tipoLog,
+                    modulo,
                     motivo,
                     nivel,
                     mensaje,
                     detalle
             );
-
             logUsuarioDAO.save(log);
-
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    // compatibilidad por si ya llamabas a este método en otros lados
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void registrarLogSeguridad(
+            Usuario usuario,
+            String motivo,
+            String nivel,
+            String mensaje,
+            String detalle
+    ) {
+        registrarLog(usuario, "SEGURIDAD", "AUTH", motivo, nivel, mensaje, detalle);
     }
 }
