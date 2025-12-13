@@ -15,7 +15,9 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
     private TokenGenerator tokenGenerator;
 
     @Override
-    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+    public boolean preHandle(HttpServletRequest request,
+                             HttpServletResponse response,
+                             Object handler) throws Exception {
 
         // Permitir OPTIONS (preflight CORS)
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
@@ -25,7 +27,23 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
         final String path = request.getRequestURI();
         final String method = request.getMethod();
 
-        // ====== RUTAS PÚBLICAS (SIN TOKEN) ======
+        // =========================================================
+        // 1) DEFINIR SI ESTE REQUEST DEBE GENERAR AUDITORÍA/LOG
+        //    (Solo mutaciones: POST/PUT/PATCH/DELETE)
+        // =========================================================
+        boolean isMutation =
+                "POST".equalsIgnoreCase(method)
+                        || "PUT".equalsIgnoreCase(method)
+                        || "PATCH".equalsIgnoreCase(method)
+                        || "DELETE".equalsIgnoreCase(method);
+
+        // Este flag lo usas donde guardas logs:
+        // if ((boolean) request.getAttribute("auditEnabled")) { ...guardar log... }
+        request.setAttribute("auditEnabled", isMutation);
+
+        // =========================================================
+        // 2) RUTAS PÚBLICAS (SIN TOKEN)
+        // =========================================================
 
         // Login y recuperación de contraseña
         if (path.equals("/auth/login")
@@ -34,10 +52,6 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
             return true;
         }
 
-        // (IMPORTANTE) /usuario y /rol YA NO son públicos en general.
-        // Si dejabas /rol público completo, no tendrás userId y no podrás loguear acciones.
-        // Si necesitas endpoints públicos específicos de /usuario, ponlos aquí puntualmente (no todo /usuario).
-
         // Recursos estáticos
         if (path.startsWith("/documents/")
                 || path.startsWith("/imagenes/")
@@ -45,24 +59,23 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
             return true;
         }
 
-        // Roles: permitir listar/obtener (GET) sin token si quieres mantenerlo público
-        if (path.startsWith("/rol") && "GET".equalsIgnoreCase(method)) {
-            return true;
-        }
+        // ✅ IMPORTANTE:
+        // Ya NO dejamos /rol público en GET.
+        // Si necesitas userId para auditoría, /rol debe ir con token.
+        // (También recomiendo proteger /rol/verificar-acceso por lo mismo)
 
-        // Verificar acceso (normalmente se usa sin token desde el frontend)
-        if (path.equals("/rol/verificar-acceso")) {
-            return true;
-        }
-
-        // ====== VALIDACIÓN DE TOKEN PARA TODO LO DEMÁS ======
+        // =========================================================
+        // 3) VALIDACIÓN DE TOKEN PARA TODO LO DEMÁS
+        // =========================================================
         String authHeader = request.getHeader("Authorization");
 
         // Si NO hay token -> 401
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType("application/json");
-            response.getWriter().write("{\"error\":\"Token no proporcionado\",\"message\":\"Debe autenticarse para acceder a este recurso\"}");
+            response.getWriter().write(
+                    "{\"error\":\"Token no proporcionado\",\"message\":\"Debe autenticarse para acceder a este recurso\"}"
+            );
             return false;
         }
 
@@ -71,7 +84,9 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
         if (claims == null) {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType("application/json");
-            response.getWriter().write("{\"error\":\"Token inválido o expirado\",\"message\":\"Su sesión ha expirado, por favor inicie sesión nuevamente\"}");
+            response.getWriter().write(
+                    "{\"error\":\"Token inválido o expirado\",\"message\":\"Su sesión ha expirado, por favor inicie sesión nuevamente\"}"
+            );
             return false;
         }
 
