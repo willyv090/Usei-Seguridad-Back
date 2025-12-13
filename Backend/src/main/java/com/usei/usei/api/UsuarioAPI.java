@@ -21,7 +21,10 @@ import com.usei.usei.models.Rol;
 import com.usei.usei.models.Usuario;
 import com.usei.usei.util.TokenGenerator;
 import com.usei.usei.controllers.LogUsuarioService;
+import jakarta.servlet.http.HttpServletRequest;
 
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jws;
 
 import jakarta.annotation.PostConstruct;
 
@@ -60,6 +63,80 @@ public class UsuarioAPI {
         System.out.println("🔧 rolBL: " + (rolBL != null ? "OK" : "NULL"));
         System.out.println("🔧 contraseniaDAO: " + (contraseniaDAO != null ? "OK" : "NULL"));
         System.out.println("🔧 securityBL: " + (securityBL != null ? "OK" : "NULL"));
+    }
+
+    private Usuario getActorFromRequest(HttpServletRequest request) {
+        try {
+            if (request == null) return null;
+
+            Object idObj = request.getAttribute("userId");
+            if (idObj == null) idObj = request.getAttribute("id_usuario");
+            if (idObj == null) idObj = request.getAttribute("idUsuario");
+
+            if (idObj == null) return null;
+
+            Long actorId = (idObj instanceof Number n)
+                    ? n.longValue()
+                    : Long.parseLong(String.valueOf(idObj));
+
+            return usuarioService.findById(actorId).orElse(null);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+    private Usuario getActor(HttpServletRequest request) {
+        // A) lo que puso el interceptor
+        Usuario actor = getActorFromRequest(request);
+        if (actor != null) return actor;
+
+        // B) fallback: leer Authorization y parsear token
+        try {
+            if (request == null) return null;
+
+            String auth = request.getHeader("Authorization");
+            if (auth == null || auth.isBlank()) return null;
+
+            // Intento 1: tal cual (por si tu TokenGenerator espera "Bearer ...")
+            try {
+                Jws<Claims> c = tokenGenerator.validateAndParseToken(auth);
+                Usuario u = resolveUserFromClaims(c);
+                if (u != null) return u;
+            } catch (Exception ignored) {}
+
+            // Intento 2: quitar "Bearer "
+            if (auth.startsWith("Bearer ")) {
+                String raw = auth.substring(7).trim();
+                if (!raw.isBlank()) {
+                    Jws<Claims> c2 = tokenGenerator.validateAndParseToken(raw);
+                    return resolveUserFromClaims(c2);
+                }
+            }
+        } catch (Exception ignored) {}
+
+        return null;
+    }
+
+    private Usuario resolveUserFromClaims(Jws<Claims> claims) {
+        if (claims == null) return null;
+
+        Object idObj = claims.getBody().get("id_usuario");
+        if (idObj == null) idObj = claims.getBody().get("id");
+        if (idObj == null) idObj = claims.getBody().get("userId");
+        if (idObj == null) idObj = claims.getBody().getSubject(); // a veces el id viene como subject
+
+        if (idObj == null) return null;
+
+        Long id;
+        if (idObj instanceof Number n) id = n.longValue();
+        else id = Long.parseLong(String.valueOf(idObj));
+
+        return usuarioService.findById(id).orElse(null);
+    }
+
+    private String safeDetalle(String s) {
+        if (s == null || s.isBlank()) return "Edición de usuario.";
+        s = s.trim();
+        return (s.length() > 255) ? s.substring(0, 255) : s;
     }
 
     // CREAR USUARIO
@@ -160,14 +237,29 @@ public class UsuarioAPI {
 
 
     // ACTUALIZAR USUARIO
+    // ACTUALIZAR USUARIO
     @PutMapping("/{id_usuario}")
-    public ResponseEntity<?> update(@PathVariable("id_usuario") Long idUsuario,
-                                    @RequestBody Usuario usuario) {
+    public ResponseEntity<?> update(
+            @PathVariable("id_usuario") Long idUsuario,
+            @RequestBody Usuario usuario,
+            HttpServletRequest request
+    ) {
         try {
             Optional<Usuario> oUsuario = usuarioService.findById(idUsuario);
             if (oUsuario.isEmpty()) return ResponseEntity.notFound().build();
 
             Usuario u = oUsuario.get();
+
+            // ===== snapshot antes (para detalle del log) =====
+            String beforeNombre   = u.getNombre();
+            String beforeApellido = u.getApellido();
+            String beforeCi       = u.getCi();
+            String beforeCorreo   = u.getCorreo();
+            Integer beforeTelefono= u.getTelefono();
+            String beforeCarrera  = u.getCarrera();
+            String beforeRol      = u.getRol();
+
+            // ===== aplicar cambios (PUT = reemplazo completo) =====
             u.setNombre(usuario.getNombre());
             u.setApellido(usuario.getApellido());
             u.setTelefono(usuario.getTelefono());
@@ -177,17 +269,52 @@ public class UsuarioAPI {
             u.setCi(usuario.getCi());
 
             Usuario updated = usuarioService.save(u);
+
+            // ===== LOG (actor = usuario logueado) =====
+            try {
+                // ✅ CAMBIO: usar getActor(request) (interceptor o token)
+                Usuario actor = getActor(request);
+
+                if (actor == null) {
+                    System.out.println("⚠️ No se registró log PUT /usuario: actor=null. Verifica Authorization Bearer o que /usuario/** esté protegido.");
+                } else if (logUsuarioService == null) {
+                    System.out.println("⚠️ No se registró log PUT /usuario: logUsuarioService=null (inyección falló).");
+                } else {
+                    StringBuilder detalle = new StringBuilder();
+                    detalle.append("Se editó usuario (PUT) ID=").append(updated.getIdUsuario())
+                            .append(" CI=").append(updated.getCi()).append(". Cambios:");
+
+                    if (!Objects.equals(beforeNombre, updated.getNombre()))
+                        detalle.append(" nombre: '").append(beforeNombre).append("' -> '").append(updated.getNombre()).append("';");
+                    if (!Objects.equals(beforeApellido, updated.getApellido()))
+                        detalle.append(" apellido: '").append(beforeApellido).append("' -> '").append(updated.getApellido()).append("';");
+                    if (!Objects.equals(beforeCorreo, updated.getCorreo()))
+                        detalle.append(" correo: '").append(beforeCorreo).append("' -> '").append(updated.getCorreo()).append("';");
+                    if (!Objects.equals(beforeCi, updated.getCi()))
+                        detalle.append(" ci: '").append(beforeCi).append("' -> '").append(updated.getCi()).append("';");
+                    if (!Objects.equals(beforeTelefono, updated.getTelefono()))
+                        detalle.append(" telefono: '").append(beforeTelefono).append("' -> '").append(updated.getTelefono()).append("';");
+                    if (!Objects.equals(beforeCarrera, updated.getCarrera()))
+                        detalle.append(" carrera: '").append(beforeCarrera).append("' -> '").append(updated.getCarrera()).append("';");
+                    if (!Objects.equals(beforeRol, updated.getRol()))
+                        detalle.append(" rol: '").append(beforeRol).append("' -> '").append(updated.getRol()).append("';");
+
+                    // ✅ CAMBIO: detalle SIEMPRE no nulo/ni vacío y max 255
+                    String det = safeDetalle(detalle.toString());
+
+                    logUsuarioService.registrarLogSeguridad(
+                            actor,
+                            "ACTUALIZACION_USUARIO",
+                            "INFO",
+                            "Edición de usuario",
+                            det
+                    );
+                }
+            } catch (Exception logEx) {
+                System.out.println("⚠️ Falló el registro del log PUT /usuario, pero la edición se mantuvo. " + logEx.getMessage());
+            }
+
             updated.setContraseniaEntity(null);
-
-            // 🔹 Registrar log usando LogUsuarioService tal como está
-            logUsuarioService.registrarLogSeguridad(
-                    updated,
-                    "ACTUALIZACION_USUARIO",                   // motivo
-                    "INFO",                                    // nivel
-                    "Actualización de usuario",                // mensaje
-                    "Actualización de usuario vía PUT /usuario/" + idUsuario  // detalle
-            );
-
             return ResponseEntity.ok(updated);
 
         } catch (Exception e) {
@@ -197,38 +324,48 @@ public class UsuarioAPI {
         }
     }
 
-
     // EDITAR USUARIO
     @PatchMapping("/{id_usuario}")
     public ResponseEntity<?> editarUsuario(
             @PathVariable("id_usuario") Long idUsuario,
-            @RequestBody Map<String, Object> body) {
+            @RequestBody Map<String, Object> body,
+            HttpServletRequest request
+    ) {
         try {
             Optional<Usuario> oUsuario = usuarioService.findById(idUsuario);
-            if (oUsuario.isEmpty())
+            if (oUsuario.isEmpty()) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Usuario no encontrado.");
+            }
 
             Usuario u = oUsuario.get();
 
-            // 🔹 Actualiza solo los campos enviados
-            if (body.containsKey("nombre")) u.setNombre((String) body.get("nombre"));
-            if (body.containsKey("apellido")) u.setApellido((String) body.get("apellido"));
-            if (body.containsKey("ci")) u.setCi((String) body.get("ci"));
-            if (body.containsKey("correo")) u.setCorreo((String) body.get("correo"));
+            // ===== snapshot antes (para detalle del log) =====
+            String beforeNombre = u.getNombre();
+            String beforeApellido = u.getApellido();
+            String beforeCi = u.getCi();
+            String beforeCorreo = u.getCorreo();
+            Integer beforeTelefono = u.getTelefono();
+            String beforeCarrera = u.getCarrera();
+            String beforeRol = u.getRol();
+
+            // ===== aplicar cambios =====
+            if (body.containsKey("nombre")) u.setNombre(String.valueOf(body.get("nombre")));
+            if (body.containsKey("apellido")) u.setApellido(String.valueOf(body.get("apellido")));
+            if (body.containsKey("ci")) u.setCi(String.valueOf(body.get("ci")));
+            if (body.containsKey("correo")) u.setCorreo(String.valueOf(body.get("correo")));
 
             if (body.containsKey("telefono")) {
                 String telStr = String.valueOf(body.get("telefono"));
-                if (telStr != null && !telStr.isBlank() && !telStr.equals("null")) {
+                if (telStr != null && !telStr.isBlank() && !"null".equalsIgnoreCase(telStr)) {
                     try {
                         u.setTelefono(Integer.parseInt(telStr));
                     } catch (NumberFormatException ex) {
-                        return ResponseEntity.badRequest()
-                                .body("El campo 'telefono' debe ser numérico.");
+                        return ResponseEntity.badRequest().body("El campo 'telefono' debe ser numérico.");
                     }
                 }
             }
 
-            if (body.containsKey("carrera")) u.setCarrera((String) body.get("carrera"));
+            if (body.containsKey("carrera")) u.setCarrera(String.valueOf(body.get("carrera")));
 
             // 🔹 Actualizar rol si llega idRol o rol
             if (body.containsKey("idRol") || body.containsKey("rol")) {
@@ -236,25 +373,23 @@ public class UsuarioAPI {
 
                 if (body.containsKey("idRol")) {
                     String idRolStr = String.valueOf(body.get("idRol"));
-                    if (idRolStr != null && !idRolStr.isBlank() && !idRolStr.equals("null")) {
+                    if (idRolStr != null && !idRolStr.isBlank() && !"null".equalsIgnoreCase(idRolStr)) {
                         try {
                             Long idRol = Long.parseLong(idRolStr);
                             nuevoRol = rolBL.obtenerRolPorId(idRol);
                         } catch (NumberFormatException ex) {
-                            return ResponseEntity.badRequest()
-                                    .body("El campo 'idRol' debe ser un número válido.");
+                            return ResponseEntity.badRequest().body("El campo 'idRol' debe ser un número válido.");
                         }
                     }
-                } else if (body.containsKey("rol")) {
+                } else {
                     String nombreRol = String.valueOf(body.get("rol"));
-                    if (nombreRol != null && !nombreRol.isBlank()) {
+                    if (nombreRol != null && !nombreRol.isBlank() && !"null".equalsIgnoreCase(nombreRol)) {
                         nuevoRol = rolBL.obtenerRolPorNombre(nombreRol);
                     }
                 }
 
                 if (nuevoRol == null) {
-                    return ResponseEntity.badRequest()
-                            .body("El rol especificado no existe o no es válido.");
+                    return ResponseEntity.badRequest().body("El rol especificado no existe o no es válido.");
                 }
 
                 u.setRolEntity(nuevoRol);
@@ -262,6 +397,51 @@ public class UsuarioAPI {
             }
 
             Usuario actualizado = usuarioService.save(u);
+
+            // ===== LOG (actor = usuario logueado) =====
+            try {
+                // ✅ CAMBIO: usar getActor(request) (interceptor o token)
+                Usuario actor = getActor(request);
+
+                if (actor == null) {
+                    System.out.println("⚠️ No se registró log: actor=null. Verifica Authorization Bearer o que /usuario/** esté protegido.");
+                } else if (logUsuarioService == null) {
+                    System.out.println("⚠️ No se registró log: logUsuarioService=null (inyección falló).");
+                } else {
+                    StringBuilder detalle = new StringBuilder();
+                    detalle.append("Se editó usuario ID=").append(actualizado.getIdUsuario())
+                            .append(" CI=").append(actualizado.getCi()).append(". Cambios:");
+
+                    if (!Objects.equals(beforeNombre, actualizado.getNombre()))
+                        detalle.append(" nombre: '").append(beforeNombre).append("' -> '").append(actualizado.getNombre()).append("';");
+                    if (!Objects.equals(beforeApellido, actualizado.getApellido()))
+                        detalle.append(" apellido: '").append(beforeApellido).append("' -> '").append(actualizado.getApellido()).append("';");
+                    if (!Objects.equals(beforeCorreo, actualizado.getCorreo()))
+                        detalle.append(" correo: '").append(beforeCorreo).append("' -> '").append(actualizado.getCorreo()).append("';");
+                    if (!Objects.equals(beforeCi, actualizado.getCi()))
+                        detalle.append(" ci: '").append(beforeCi).append("' -> '").append(actualizado.getCi()).append("';");
+                    if (!Objects.equals(beforeTelefono, actualizado.getTelefono()))
+                        detalle.append(" telefono: '").append(beforeTelefono).append("' -> '").append(actualizado.getTelefono()).append("';");
+                    if (!Objects.equals(beforeCarrera, actualizado.getCarrera()))
+                        detalle.append(" carrera: '").append(beforeCarrera).append("' -> '").append(actualizado.getCarrera()).append("';");
+                    if (!Objects.equals(beforeRol, actualizado.getRol()))
+                        detalle.append(" rol: '").append(beforeRol).append("' -> '").append(actualizado.getRol()).append("';");
+
+                    // ✅ CAMBIO: detalle SIEMPRE no nulo y no vacío
+                    String det = safeDetalle(detalle.toString());
+
+                    logUsuarioService.registrarLogSeguridad(
+                            actor,
+                            "ACTUALIZACION_USUARIO",
+                            "INFO",
+                            "Edición de usuario",
+                            det
+                    );
+                }
+            } catch (Exception logEx) {
+                System.out.println("⚠️ Falló el registro del log, pero la edición se mantuvo. " + logEx.getMessage());
+            }
+
             actualizado.setContraseniaEntity(null);
             return ResponseEntity.ok(actualizado);
 
