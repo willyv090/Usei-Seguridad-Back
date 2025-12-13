@@ -2,8 +2,6 @@ package com.usei.usei.api;
 
 import java.util.Map;
 import java.util.Arrays;
-import java.util.List;
-import java.util.stream.Collectors;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
@@ -64,30 +62,30 @@ public class RolAPI {
         }
     }
 
-    // tu columna detalle es length=150 (en log usuario)
+    // tu columna detalle es length=255 (según tu LogUsuario), aquí lo limito por si acaso
     private String safeDetalle(String s) {
         if (s == null) return "SIN_DETALLE";
         s = String.valueOf(s).trim();
         if (s.isBlank()) s = "SIN_DETALLE";
-        return (s.length() > 150) ? s.substring(0, 150) : s;
+        return (s.length() > 255) ? s.substring(0, 255) : s;
     }
 
     /**
      * Registra log sin romper el endpoint.
      * Si no hay token válido, simplemente no registra.
      */
-    private void tryLog(String authHeader, String motivo, String mensaje, String detalle) {
+    private void tryLog(String authHeader, String modulo, String tipo, String motivo, String nivel, String mensaje, String detalle) {
         try {
             Usuario authUser = getUsuarioFromToken(authHeader);
             if (authUser == null) return;
 
             logUsuarioService.registrarLog(
                     authUser,
-                    "SEGURIDAD",
-                    "ROL",
-                    motivo,
-                    "INFO",
-                    mensaje,
+                    modulo,    // ej: "Módulo Gestión de Roles"
+                    tipo,      // ej: "ROL"
+                    motivo,    // ej: "CREAR_ROL"
+                    nivel,     // "INFO"
+                    mensaje,   // texto corto
                     safeDetalle(detalle)
             );
         } catch (Exception ignored) {
@@ -95,25 +93,7 @@ public class RolAPI {
         }
     }
 
-    // =========================
-    // Helpers para detalle textual
-    // =========================
-
-    private List<String> parseAccesos(String accesos) {
-        if (accesos == null || accesos.trim().isEmpty()) return List.of();
-        return Arrays.stream(accesos.split(","))
-                .map(String::trim)
-                .filter(s -> !s.isBlank())
-                .collect(Collectors.toList());
-    }
-
-    private int countAccesos(String accesos) {
-        return parseAccesos(accesos).size();
-    }
-
-    // ============
-    // ENDPOINTS
-    // ============
+    // ============ ENDPOINTS ============
 
     // CREAR ROL
     @PostMapping
@@ -129,51 +109,67 @@ public class RolAPI {
 
             Rol saved = rolBL.crearRolCompleto(rol);
 
-            String detalle = "Creó el rol \"" + saved.getNombreRol() + "\" (ID " + saved.getIdRol() + "). "
-                    + "Accesos: " + countAccesos(saved.getAccesos()) + " permiso(s).";
-
             tryLog(
                     authHeader,
+                    "Módulo Gestión de Roles",
+                    "ROL",
                     "CREAR_ROL",
-                    "CREAR_ROL",
-                    detalle
+                    "INFO",
+                    "Se creó un rol",
+                    "Creó el rol '" + saved.getNombreRol() + "' (ID: " + saved.getIdRol() + ")"
             );
 
             return ResponseEntity.status(HttpStatus.CREATED).body(saved);
 
         } catch (RuntimeException ex) {
-            // (Opcional) log de error si quieres
-            tryLog(authHeader, "CREAR_ROL_ERROR", "CREAR_ROL_ERROR", "No se pudo crear el rol: " + ex.getMessage());
+            tryLog(
+                    authHeader,
+                    "Módulo Gestión de Roles",
+                    "ROL",
+                    "CREAR_ROL_ERROR",
+                    "ERROR",
+                    "Error al crear rol",
+                    "Error: " + ex.getMessage()
+            );
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());
 
         } catch (Exception ex) {
             ex.printStackTrace();
-            tryLog(authHeader, "CREAR_ROL_ERROR", "CREAR_ROL_ERROR", "Error inesperado al crear rol: " + ex.getMessage());
+            tryLog(
+                    authHeader,
+                    "Módulo Gestión de Roles",
+                    "ROL",
+                    "CREAR_ROL_ERROR",
+                    "ERROR",
+                    "Error inesperado al crear rol",
+                    "Error inesperado: " + ex.getMessage()
+            );
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error inesperado al crear rol: " + ex.getMessage());
         }
     }
 
-    // LISTAR ROLES  ✅ SIN LOG EN GET
+    // LISTAR ROLES (NO LOG EN GET)
     @GetMapping
-    public ResponseEntity<?> listar(
-            @RequestHeader(value = "Authorization", required = false) String authHeader
-    ) {
+    public ResponseEntity<?> listar() {
         try {
             Iterable<Rol> roles = rolBL.listarRoles();
-
-            // ✅ NO LOGUEAR GET
-            // tryLog(authHeader, "LISTAR_ROLES", "LISTAR_ROLES", "Listó roles del sistema");
-
             return ResponseEntity.ok(roles);
-
         } catch (Exception ex) {
             ex.printStackTrace();
-            // Si quieres, puedes loguear errores internos (pero NO recomendado si también es GET)
-            // tryLog(authHeader, "LISTAR_ROLES_ERROR", "LISTAR_ROLES_ERROR", "Error: " + ex.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error al listar roles: " + ex.getMessage());
         }
+    }
+
+    // OBTENER ROL POR ID (NO LOG EN GET)
+    @GetMapping("/{idRol}")
+    public ResponseEntity<?> obtenerPorId(@PathVariable Long idRol) {
+        Rol rol = rolBL.obtenerRolPorId(idRol);
+        if (rol == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Rol no encontrado.");
+        }
+        return ResponseEntity.ok(rol);
     }
 
     // ELIMINAR ROL
@@ -190,24 +186,41 @@ public class RolAPI {
 
             rolBL.eliminarRol(idRol);
 
-            String detalle = "Eliminó el rol \"" + antes.getNombreRol() + "\" (ID " + idRol + ").";
-
             tryLog(
                     authHeader,
+                    "Módulo Gestión de Roles",
+                    "ROL",
                     "ELIMINAR_ROL",
-                    "ELIMINAR_ROL",
-                    detalle
+                    "INFO",
+                    "Se eliminó un rol",
+                    "Eliminó el rol '" + antes.getNombreRol() + "' (ID: " + idRol + ")"
             );
 
             return ResponseEntity.ok("Rol eliminado correctamente.");
 
         } catch (RuntimeException ex) {
-            tryLog(authHeader, "ELIMINAR_ROL_ERROR", "ELIMINAR_ROL_ERROR", "No se pudo eliminar el rol ID " + idRol + ": " + ex.getMessage());
+            tryLog(
+                    authHeader,
+                    "Módulo Gestión de Roles",
+                    "ROL",
+                    "ELIMINAR_ROL_ERROR",
+                    "ERROR",
+                    "Error al eliminar rol",
+                    "ID=" + idRol + " | Error: " + ex.getMessage()
+            );
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());
 
         } catch (Exception ex) {
             ex.printStackTrace();
-            tryLog(authHeader, "ELIMINAR_ROL_ERROR", "ELIMINAR_ROL_ERROR", "Error inesperado al eliminar rol ID " + idRol + ": " + ex.getMessage());
+            tryLog(
+                    authHeader,
+                    "Módulo Gestión de Roles",
+                    "ROL",
+                    "ELIMINAR_ROL_ERROR",
+                    "ERROR",
+                    "Error inesperado al eliminar rol",
+                    "ID=" + idRol + " | Error: " + ex.getMessage()
+            );
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error al eliminar rol: " + ex.getMessage());
         }
@@ -231,45 +244,44 @@ public class RolAPI {
 
             Rol actualizado = rolBL.cambiarEstadoRol(idRol, nuevoEstado);
 
-            String detalle = "Cambió el estado del rol \"" + actualizado.getNombreRol() + "\" (ID " + idRol + "): "
-                    + (estadoAntes ? "Activo" : "Inactivo") + " → " + (nuevoEstado ? "Activo" : "Inactivo") + ".";
-
             tryLog(
                     authHeader,
+                    "Módulo Gestión de Roles",
+                    "ROL",
                     "CAMBIO_ESTADO_ROL",
-                    "CAMBIO_ESTADO_ROL",
-                    detalle
+                    "INFO",
+                    "Se cambió el estado de un rol",
+                    "Rol '" + actualizado.getNombreRol() + "' (ID: " + idRol + ") activo: " + estadoAntes + " → " + nuevoEstado
             );
 
             return ResponseEntity.ok(actualizado);
 
         } catch (RuntimeException ex) {
-            tryLog(authHeader, "CAMBIO_ESTADO_ROL_ERROR", "CAMBIO_ESTADO_ROL_ERROR", "No se pudo cambiar estado del rol ID " + idRol + ": " + ex.getMessage());
+            tryLog(
+                    authHeader,
+                    "Módulo Gestión de Roles",
+                    "ROL",
+                    "CAMBIO_ESTADO_ROL_ERROR",
+                    "ERROR",
+                    "Error al cambiar estado de rol",
+                    "ID=" + idRol + " | Error: " + ex.getMessage()
+            );
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());
 
         } catch (Exception ex) {
             ex.printStackTrace();
-            tryLog(authHeader, "CAMBIO_ESTADO_ROL_ERROR", "CAMBIO_ESTADO_ROL_ERROR", "Error inesperado al cambiar estado del rol ID " + idRol + ": " + ex.getMessage());
+            tryLog(
+                    authHeader,
+                    "Módulo Gestión de Roles",
+                    "ROL",
+                    "CAMBIO_ESTADO_ROL_ERROR",
+                    "ERROR",
+                    "Error inesperado al cambiar estado de rol",
+                    "ID=" + idRol + " | Error: " + ex.getMessage()
+            );
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error al cambiar el estado del rol: " + ex.getMessage());
         }
-    }
-
-    // OBTENER ROL POR ID ✅ SIN LOG EN GET
-    @GetMapping("/{idRol}")
-    public ResponseEntity<?> obtenerPorId(
-            @RequestHeader(value = "Authorization", required = false) String authHeader,
-            @PathVariable Long idRol
-    ) {
-        Rol rol = rolBL.obtenerRolPorId(idRol);
-        if (rol == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Rol no encontrado.");
-        }
-
-        // ✅ NO LOGUEAR GET
-        // tryLog(authHeader, "OBTENER_ROL", "OBTENER_ROL", "Consultó rol id=" + idRol);
-
-        return ResponseEntity.ok(rol);
     }
 
     // ACTUALIZAR ROL
@@ -285,64 +297,52 @@ public class RolAPI {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Rol no encontrado.");
             }
 
-            String nombreAntes = (antes.getNombreRol() == null) ? "" : antes.getNombreRol();
+            String nombreAntes = antes.getNombreRol();
             boolean activoAntes = Boolean.TRUE.equals(antes.getActivo());
             String accesosAntes = (antes.getAccesos() == null) ? "" : antes.getAccesos();
 
             Rol actualizado = rolBL.actualizarRol(idRol, rolActualizado);
 
-            String nombreNuevo = (actualizado.getNombreRol() == null) ? "" : actualizado.getNombreRol();
-            boolean activoNuevo = Boolean.TRUE.equals(actualizado.getActivo());
-            String accesosNuevo = (actualizado.getAccesos() == null) ? "" : actualizado.getAccesos();
-
-            int cantAntes = countAccesos(accesosAntes);
-            int cantNuevo = countAccesos(accesosNuevo);
-
-            StringBuilder detalle = new StringBuilder();
-            detalle.append("Actualizó el rol \"")
-                    .append(nombreAntes.isBlank() ? "SIN_NOMBRE" : nombreAntes)
-                    .append("\" (ID ")
-                    .append(idRol)
-                    .append("). ");
-
-            boolean cambioAlgo = false;
-
-            if (!nombreNuevo.equals(nombreAntes) && !nombreNuevo.isBlank()) {
-                detalle.append("Nombre: \"").append(nombreAntes).append("\" → \"").append(nombreNuevo).append("\". ");
-                cambioAlgo = true;
-            }
-
-            if (activoAntes != activoNuevo) {
-                detalle.append("Estado: ").append(activoAntes ? "Activo" : "Inactivo")
-                        .append(" → ").append(activoNuevo ? "Activo" : "Inactivo").append(". ");
-                cambioAlgo = true;
-            }
-
-            if (cantAntes != cantNuevo) {
-                detalle.append("Accesos: ").append(cantAntes).append(" → ").append(cantNuevo).append(" permiso(s). ");
-                cambioAlgo = true;
-            }
-
-            if (!cambioAlgo) {
-                detalle.append("No se detectaron cambios relevantes.");
-            }
+            String detalle = "Rol '" + nombreAntes + "' (ID: " + idRol + ") → '" + actualizado.getNombreRol() + "'. "
+                    + "Activo: " + activoAntes + " → " + actualizado.isActivo() + ". "
+                    + "Accesos: " + (accesosAntes.isBlank() ? "Sin accesos" : "Actualizados")
+                    + " → " + ((actualizado.getAccesos() == null || actualizado.getAccesos().isBlank()) ? "Sin accesos" : "Actualizados");
 
             tryLog(
                     authHeader,
+                    "Módulo Gestión de Roles",
+                    "ROL",
                     "ACTUALIZAR_ROL",
-                    "ACTUALIZAR_ROL",
-                    detalle.toString()
+                    "INFO",
+                    "Se actualizó un rol",
+                    detalle
             );
 
             return ResponseEntity.ok(actualizado);
 
         } catch (RuntimeException ex) {
-            tryLog(authHeader, "ACTUALIZAR_ROL_ERROR", "ACTUALIZAR_ROL_ERROR", "No se pudo actualizar el rol ID " + idRol + ": " + ex.getMessage());
+            tryLog(
+                    authHeader,
+                    "Módulo Gestión de Roles",
+                    "ROL",
+                    "ACTUALIZAR_ROL_ERROR",
+                    "ERROR",
+                    "Error al actualizar rol",
+                    "ID=" + idRol + " | Error: " + ex.getMessage()
+            );
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());
 
         } catch (Exception ex) {
             ex.printStackTrace();
-            tryLog(authHeader, "ACTUALIZAR_ROL_ERROR", "ACTUALIZAR_ROL_ERROR", "Error inesperado al actualizar el rol ID " + idRol + ": " + ex.getMessage());
+            tryLog(
+                    authHeader,
+                    "Módulo Gestión de Roles",
+                    "ROL",
+                    "ACTUALIZAR_ROL_ERROR",
+                    "ERROR",
+                    "Error inesperado al actualizar rol",
+                    "ID=" + idRol + " | Error: " + ex.getMessage()
+            );
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error al actualizar el rol: " + ex.getMessage());
         }
@@ -386,7 +386,7 @@ public class RolAPI {
         }
     }
 
-    // OBTENER ACCESOS (GET) -> no se registra log
+    // OBTENER ACCESOS
     @GetMapping("/{idRol}/accesos")
     public ResponseEntity<?> obtenerAccesos(@PathVariable Long idRol) {
         try {
