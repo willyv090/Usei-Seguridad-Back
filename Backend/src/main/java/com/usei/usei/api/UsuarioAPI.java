@@ -20,6 +20,8 @@ import com.usei.usei.models.LoginResponse;
 import com.usei.usei.models.Rol;
 import com.usei.usei.models.Usuario;
 import com.usei.usei.util.TokenGenerator;
+import com.usei.usei.controllers.LogUsuarioService;
+
 
 import jakarta.annotation.PostConstruct;
 
@@ -41,6 +43,10 @@ public class UsuarioAPI {
 
     @Autowired
     private SecurityBL securityBL;
+
+    @Autowired
+    private LogUsuarioService logUsuarioService;
+
 
     public UsuarioAPI() {
         System.out.println("🔧 UsuarioAPI constructor called");
@@ -155,23 +161,42 @@ public class UsuarioAPI {
 
     // ACTUALIZAR USUARIO
     @PutMapping("/{id_usuario}")
-    public ResponseEntity<?> update(@PathVariable("id_usuario") Long idUsuario, @RequestBody Usuario usuario) {
-        Optional<Usuario> oUsuario = usuarioService.findById(idUsuario);
-        if (oUsuario.isEmpty()) return ResponseEntity.notFound().build();
+    public ResponseEntity<?> update(@PathVariable("id_usuario") Long idUsuario,
+                                    @RequestBody Usuario usuario) {
+        try {
+            Optional<Usuario> oUsuario = usuarioService.findById(idUsuario);
+            if (oUsuario.isEmpty()) return ResponseEntity.notFound().build();
 
-        Usuario u = oUsuario.get();
-        u.setNombre(usuario.getNombre());
-        u.setApellido(usuario.getApellido());
-        u.setTelefono(usuario.getTelefono());
-        u.setCorreo(usuario.getCorreo());
-        u.setCarrera(usuario.getCarrera());
-        u.setRol(usuario.getRol());
-        u.setCi(usuario.getCi());
+            Usuario u = oUsuario.get();
+            u.setNombre(usuario.getNombre());
+            u.setApellido(usuario.getApellido());
+            u.setTelefono(usuario.getTelefono());
+            u.setCorreo(usuario.getCorreo());
+            u.setCarrera(usuario.getCarrera());
+            u.setRol(usuario.getRol());
+            u.setCi(usuario.getCi());
 
-        Usuario updated = usuarioService.save(u);
-        updated.setContraseniaEntity(null);
-        return ResponseEntity.status(HttpStatus.CREATED).body(updated);
+            Usuario updated = usuarioService.save(u);
+            updated.setContraseniaEntity(null);
+
+            // 🔹 Registrar log usando LogUsuarioService tal como está
+            logUsuarioService.registrarLogSeguridad(
+                    updated,
+                    "ACTUALIZACION_USUARIO",                   // motivo
+                    "INFO",                                    // nivel
+                    "Actualización de usuario",                // mensaje
+                    "Actualización de usuario vía PUT /usuario/" + idUsuario  // detalle
+            );
+
+            return ResponseEntity.ok(updated);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error al actualizar usuario: " + e.getMessage());
+        }
     }
+
 
     // EDITAR USUARIO
     @PatchMapping("/{id_usuario}")
