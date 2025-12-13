@@ -50,11 +50,11 @@ public class RiesgoEventoBL {
         
         RiesgoEvento riesgoGuardado = riesgoEventoDAO.save(riesgo);
         
-        // Actualizar KRI automáticamente después de crear el riesgo
+        // Crear KRI automáticamente para este riesgo
         try {
-            indicadorRiesgoBL.actualizarKRIAutomaticamente();
+            indicadorRiesgoBL.crearKRIDesdeRiesgo(riesgoGuardado);
         } catch (Exception e) {
-            logger.warn("Error al actualizar KRI automáticamente: {}", e.getMessage());
+            logger.warn("Error al crear KRI para el riesgo: {}", e.getMessage());
         }
         
         return riesgoGuardado;
@@ -88,9 +88,9 @@ public class RiesgoEventoBL {
         
         // Actualizar KRI automáticamente después de actualizar el riesgo
         try {
-            indicadorRiesgoBL.actualizarKRIAutomaticamente();
+            indicadorRiesgoBL.crearKRIDesdeRiesgo(riesgoActualizado);
         } catch (Exception e) {
-            logger.warn("Error al actualizar KRI automáticamente: {}", e.getMessage());
+            logger.warn("Error al actualizar KRI: {}", e.getMessage());
         }
         
         return riesgoActualizado;

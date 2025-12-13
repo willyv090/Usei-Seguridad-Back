@@ -27,55 +27,60 @@ public class IndicadorRiesgoBL {
     @Autowired
     private RiesgoEventoDAO riesgoEventoDAO;
     
-    // Actualizar KRI automáticamente basado en estadísticas de riesgos
+    // Crear KRI automáticamente desde un riesgo
     @Transactional
-    public void actualizarKRIAutomaticamente() {
-        logger.info("Actualizando KRI automáticamente basado en estadísticas de riesgos");
+    public void crearKRIDesdeRiesgo(RiesgoEvento riesgo) {
+        logger.info("Creando KRI automáticamente para riesgo: {}", riesgo.getTitulo());
         
         try {
-            // Calcular estadísticas directamente desde el DAO
-            List<RiesgoEvento> todosLosRiesgos = riesgoEventoDAO.findAll();
+            // Verificar si ya existe un KRI para esta categoría de riesgo
+            List<IndicadorRiesgo> indicadoresExistentes = indicadorRiesgoDAO.findByActivoTrue();
+            boolean kriExiste = indicadoresExistentes.stream()
+                .anyMatch(ind -> ind.getNombre().equalsIgnoreCase(riesgo.getCategoria()));
             
-            int totalRiesgos = todosLosRiesgos.size();
-            int riesgosCriticos = (int) todosLosRiesgos.stream()
-                .filter(r -> "Crítico".equalsIgnoreCase(r.getNivelRiesgo()))
-                .count();
-            int riesgosAltos = (int) todosLosRiesgos.stream()
-                .filter(r -> "Alto".equalsIgnoreCase(r.getNivelRiesgo()))
-                .count();
-            
-            logger.info("Estadísticas calculadas - Total: {}, Críticos: {}, Altos: {}", 
-                totalRiesgos, riesgosCriticos, riesgosAltos);
-            
-            // Buscar y actualizar KRI específicos por nombre
-            List<IndicadorRiesgo> indicadores = indicadorRiesgoDAO.findByActivoTrue();
-            
-            for (IndicadorRiesgo indicador : indicadores) {
-                BigDecimal nuevoValor = null;
+            if (!kriExiste) {
+                // Contar solo riesgos activos (no Controlado ni Cerrado)
+                long conteoRiesgosActivos = riesgoEventoDAO.findAll().stream()
+                    .filter(r -> r.getCategoria().equalsIgnoreCase(riesgo.getCategoria()))
+                    .filter(r -> !r.getEstado().equalsIgnoreCase("Controlado") && !r.getEstado().equalsIgnoreCase("Cerrado"))
+                    .count();
                 
-                // Actualizar según el tipo de indicador
-                if (indicador.getNombre().toLowerCase().contains("intentos de acceso")) {
-                    // KRI: Intentos de Acceso No Autorizados
-                    // Usar el TOTAL de riesgos registrados (todos los riesgos)
-                    nuevoValor = BigDecimal.valueOf(totalRiesgos);
+                // Crear nuevo KRI basado en la categoría del riesgo
+                IndicadorRiesgo nuevoKRI = new IndicadorRiesgo();
+                nuevoKRI.setNombre(riesgo.getCategoria());
+                nuevoKRI.setDescripcion("Indicador para monitorear riesgos de tipo: " + riesgo.getCategoria());
+                nuevoKRI.setTipoIndicador("Seguridad");
+                nuevoKRI.setUmbralCritico(new BigDecimal("10.00"));
+                nuevoKRI.setUmbralAdvertencia(new BigDecimal("5.00"));
+                nuevoKRI.setValorActual(BigDecimal.valueOf(conteoRiesgosActivos));
+                nuevoKRI.setUnidadMedida("Número de riesgos activos");
+                nuevoKRI.setFrecuenciaMedicion("Diario");
+                nuevoKRI.setUsuarioCreacion(riesgo.getUsuarioRegistro());
+                
+                indicadorRiesgoDAO.save(nuevoKRI);
+                logger.info("KRI creado automáticamente: {} = {}", nuevoKRI.getNombre(), conteoRiesgosActivos);
+            } else {
+                // Si ya existe, actualizar el contador (solo riesgos activos)
+                IndicadorRiesgo kriExistente = indicadoresExistentes.stream()
+                    .filter(ind -> ind.getNombre().equalsIgnoreCase(riesgo.getCategoria()))
+                    .findFirst()
+                    .orElse(null);
+                
+                if (kriExistente != null) {
+                    long conteoRiesgosActivos = riesgoEventoDAO.findAll().stream()
+                        .filter(r -> r.getCategoria().equalsIgnoreCase(riesgo.getCategoria()))
+                        .filter(r -> !r.getEstado().equalsIgnoreCase("Controlado") && !r.getEstado().equalsIgnoreCase("Cerrado"))
+                        .count();
                     
-                } else if (indicador.getNombre().toLowerCase().contains("contraseña")) {
-                    // KRI: Contraseñas No Conformes
-                    // También usar el total de riesgos para mostrar todos
-                    nuevoValor = BigDecimal.valueOf(totalRiesgos);
-                }
-                
-                // Actualizar el valor si fue calculado
-                if (nuevoValor != null && !nuevoValor.equals(indicador.getValorActual())) {
-                    indicador.setValorActual(nuevoValor);
-                    indicador.setUltimaActualizacion(LocalDateTime.now());
-                    indicadorRiesgoDAO.save(indicador);
-                    logger.info("KRI actualizado: {} = {}", indicador.getNombre(), nuevoValor);
+                    kriExistente.setValorActual(BigDecimal.valueOf(conteoRiesgosActivos));
+                    kriExistente.setUltimaActualizacion(LocalDateTime.now());
+                    indicadorRiesgoDAO.save(kriExistente);
+                    logger.info("KRI actualizado: {} = {} (solo riesgos activos)", kriExistente.getNombre(), conteoRiesgosActivos);
                 }
             }
             
         } catch (Exception e) {
-            logger.error("Error al actualizar KRI automáticamente", e);
+            logger.error("Error al crear KRI desde riesgo", e);
         }
     }
     
